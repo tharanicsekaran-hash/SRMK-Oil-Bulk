@@ -44,6 +44,12 @@ export default function MapPicker({ value, onChange }: { value?: LatLng; onChang
 
     (async () => {
       const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "";
+      if (!apiKey) {
+        if (typeof window !== "undefined") {
+          console.warn("Google Maps API key is missing: set NEXT_PUBLIC_GOOGLE_MAPS_API_KEY in environment");
+        }
+        return;
+      }
       await loadGoogleMaps(apiKey);
 
       if (!mapRef.current) return;
