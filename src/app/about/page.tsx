@@ -1,5 +1,4 @@
 "use client";
-import { useI18n } from "@/components/LanguageProvider";
 import { motion } from "framer-motion";
 import { fadeUp, stagger } from "@/lib/animations";
 
@@ -19,7 +18,6 @@ const testimonials = [
 ];
 
 export default function AboutPage() {
-  const { t } = useI18n();
   return (
     <div className="max-w-6xl mx-auto px-4 py-10 space-y-12">
       <section>

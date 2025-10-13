@@ -7,7 +7,8 @@ export type LatLng = { lat: number; lng: number };
 let mapsLoaderPromise: Promise<void> | null = null;
 function loadGoogleMaps(apiKey: string): Promise<void> {
   if (typeof window === "undefined") return Promise.resolve();
-  if ((window as any).google?.maps?.places) return Promise.resolve();
+  const w = window as unknown as { google?: { maps?: { places?: unknown } } };
+  if (w.google?.maps?.places) return Promise.resolve();
   if (mapsLoaderPromise) return mapsLoaderPromise;
 
   const src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey)}&libraries=places&v=weekly`;
