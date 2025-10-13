@@ -53,6 +53,12 @@ export default function Header() {
               </span>
             )}
           </Link>
+          <ToggleSwitch
+            leftLabel="தமிழ்"
+            rightLabel="EN"
+            checked={locale === "en"}
+            onChange={(checked: boolean) => setLocale(checked ? "en" : "ta")}
+          />
           <button aria-label="Menu" onClick={() => setOpen((o) => !o)} className="inline-flex items-center justify-center p-2 rounded hover:bg-gray-100">
             {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </button>
@@ -64,14 +70,6 @@ export default function Header() {
             <Link href="/" className="py-1 hover:text-[#d97706]" onClick={() => setOpen(false)}>{t.nav.home}</Link>
             <Link href="/products" className="py-1 hover:text-[#d97706]" onClick={() => setOpen(false)}>{t.nav.products}</Link>
             <Link href="/about" className="py-1 hover:text-[#d97706]" onClick={() => setOpen(false)}>About</Link>
-            <div className="py-2">
-              <ToggleSwitch
-                leftLabel="தமிழ்"
-                rightLabel="EN"
-                checked={locale === "en"}
-                onChange={(checked: boolean) => setLocale(checked ? "en" : "ta")}
-              />
-            </div>
           </div>
         </div>
       )}
