@@ -11,7 +11,7 @@ export default function MotionInView({
 }: {
   children: React.ReactNode;
   variants: Variants;
-  as?: any;
+  as?: React.ElementType;
   amount?: number; // fraction of element that must be visible
   className?: string;
 }) {

@@ -13,22 +13,22 @@ export default function ProductDetailPage() {
   const add = useCart((s) => s.add);
 
   const p = sampleProducts.find((p) => p.slug === params.slug);
-  if (!p)
-    return (
-      <div className="max-w-4xl mx-auto px-4 py-6">
-        <p>Not found</p>
-      </div>
-    );
-
-  const name = locale === "ta" ? p.nameTa : p.nameEn;
-  const desc = locale === "ta" ? p.descriptionTa : p.descriptionEn;
-  const variants = useMemo(() => p.variants ?? [{ unit: p.unit, pricePaisa: p.pricePaisa }], [p]);
+  const name = p ? (locale === "ta" ? p.nameTa : p.nameEn) : "";
+  const desc = p ? (locale === "ta" ? p.descriptionTa : p.descriptionEn) : "";
+  const variants = useMemo(
+    () => (p ? p.variants ?? [{ unit: p.unit, pricePaisa: p.pricePaisa }] : []),
+    [p]
+  );
   const [activeIdx, setActiveIdx] = useState(0);
   const [qty, setQty] = useState(1);
-  const active = variants[activeIdx];
+  const active = variants[activeIdx] ?? (p ? { unit: p.unit, pricePaisa: p.pricePaisa } : undefined);
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-8 grid gap-8 md:grid-cols-2">
+      {!p ? (
+        <div className="md:col-span-2">Not found</div>
+      ) : (
+        <>
       <div className="p-4 rounded-xl bg-white border shadow-sm">
         <div className="relative aspect-square w-full overflow-hidden rounded-lg bg-gradient-to-br from-amber-50 to-amber-100">
           {p.imageUrl && (
@@ -68,21 +68,21 @@ export default function ProductDetailPage() {
           </div>
         </div>
 
-        <div className="text-2xl font-semibold text-[#d97706]">{formatPricePaisa(active.pricePaisa, locale)}</div>
+        <div className="text-2xl font-semibold text-[#d97706]">{formatPricePaisa((active?.pricePaisa ?? p.pricePaisa), locale)}</div>
 
         {desc && <p className="text-sm text-gray-700 leading-6">{desc}</p>}
 
         <div className="flex gap-3 pt-2">
           <button
             className="px-5 py-2.5 rounded bg-[#d97706] text-white hover:bg-[#b76405]"
-            onClick={() => add(p as Product, qty, name, { pricePaisa: active.pricePaisa, unit: active.unit })}
+            onClick={() => add(p as Product, qty, name, { pricePaisa: (active?.pricePaisa ?? p.pricePaisa), unit: (active?.unit ?? p.unit) })}
           >
             {t.actions.addToCart}
           </button>
           <button
             className="px-5 py-2.5 rounded border hover:bg-gray-50"
             onClick={() => {
-              add(p as Product, qty, name, { pricePaisa: active.pricePaisa, unit: active.unit });
+              add(p as Product, qty, name, { pricePaisa: (active?.pricePaisa ?? p.pricePaisa), unit: (active?.unit ?? p.unit) });
               router.push("/checkout");
             }}
           >
@@ -90,6 +90,8 @@ export default function ProductDetailPage() {
           </button>
         </div>
       </div>
+        </>
+      )}
     </div>
   );
 }

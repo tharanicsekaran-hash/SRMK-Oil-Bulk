@@ -58,7 +58,7 @@ export async function GET() {
         "",
       ].map(csvEscape).join(","));
     } else {
-      o.items.forEach((it: any, idx: number) => {
+      o.items.forEach((it: { productName: string; unit: string; quantity: number; pricePaisa: number }, idx: number) => {
         rows.push([
           o.id,
           o.createdAt.toISOString(),
