@@ -69,7 +69,7 @@ export async function POST(req: Request) {
     });
 
     return NextResponse.json({ ok: true, order });
-  } catch (e: any) {
+  } catch (e: unknown) {
     console.error(e);
     return NextResponse.json({ error: "Failed to create order" }, { status: 500 });
   }
