@@ -7,25 +7,41 @@ import { motion } from "framer-motion";
 import { fadeUp, stagger } from "@/lib/animations";
 import MotionInView from "@/components/MotionInView";
 import { ShieldCheck, Award, Truck, ShoppingBag } from "lucide-react";
+import Image from "next/image";
+import { useState } from "react";
 
 export default function Home() {
   const { t } = useI18n();
+  const [heroOk, setHeroOk] = useState(true);
   return (
     <>
-      <section className="bg-gradient-to-b from-amber-50 to-white">
-        <div className="max-w-6xl mx-auto px-4 py-14 grid gap-6 md:grid-cols-2 items-center">
-          <MotionInView className="space-y-4" variants={stagger()}>
-            <motion.h1 className="text-4xl md:text-5xl font-extrabold tracking-tight" variants={fadeUp}>{t.home.heroTitle}</motion.h1>
-            <motion.p className="text-lg text-gray-700" variants={fadeUp}>{t.home.heroSubtitle}</motion.p>
-            <motion.div className="flex gap-3" variants={fadeUp}>
-              <Link href="/products" className="px-5 py-3 rounded-md bg-[#d97706] text-white hover:bg-[#b76405] font-semibold">
-                {t.home.shopNow}
-              </Link>
-            </motion.div>
-          </MotionInView>
-          <MotionInView variants={fadeUp}>
-            <div className="aspect-video rounded bg-amber-100" />
-          </MotionInView>
+      <section className="relative h-[420px] md:h-[520px] overflow-hidden">
+        {heroOk ? (
+          <Image
+            src="/images/hero.jpg"
+            alt="SRMK Oils"
+            fill
+            priority
+            className="object-cover"
+            style={{ objectPosition: "right center" }}
+            onError={() => setHeroOk(false)}
+          />
+        ) : (
+          <div className="absolute inset-0 bg-gradient-to-br from-amber-50 via-gray-200 to-amber-100" />
+        )}
+        <div className="absolute inset-0 bg-gradient-to-r from-black/45 via-black/25 to-black/0" />
+        <div className="relative z-10 h-full">
+          <div className="max-w-6xl mx-auto h-full px-4 flex items-center">
+            <MotionInView className="space-y-4 text-white" variants={stagger()}>
+              <motion.h1 className="text-4xl md:text-5xl font-extrabold tracking-tight" variants={fadeUp}>{t.home.heroTitle}</motion.h1>
+              <motion.p className="text-lg text-white/90 max-w-2xl" variants={fadeUp}>{t.home.heroSubtitle}</motion.p>
+              <motion.div className="flex gap-3" variants={fadeUp}>
+                <Link href="/products" className="px-5 py-3 rounded-md bg-[#d97706] text-white hover:bg-[#b76405] font-semibold">
+                  {t.home.shopNow}
+                </Link>
+              </motion.div>
+            </MotionInView>
+          </div>
         </div>
       </section>
 

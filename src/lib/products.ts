@@ -15,12 +15,12 @@ export type Product = {
 export const sampleProducts: Product[] = [
   {
     id: "1",
-    slug: "nallaennai-1l",
-    nameTa: "நல்லெண்ணெய்",
+    slug: "groundnut-oil",
+    nameTa: "கடலையெண்ணெய்",
     nameEn: "Groundnut Oil",
     descriptionTa: "மரபுத் தயாரிப்பு, சுவை நிறைந்தது.",
     descriptionEn: "Traditional, flavorful cold-pressed groundnut oil.",
-    imageUrl: "/images/groundnut.svg",
+    imageUrl: "/images/groundnut.jpg",
     pricePaisa: 45000,
     unit: "1L",
     variants: [
@@ -32,12 +32,12 @@ export const sampleProducts: Product[] = [
   },
   {
     id: "2",
-    slug: "yellennai-1l",
-    nameTa: "எள்ளெண்ணெய்",
-    nameEn: "Sesame Oil",
+    slug: "gingelly-oil-sugarcane",
+    nameTa: "எள்ளெண்ணெய் (கரும்புச் சேர்க்கப்பட்டது)",
+    nameEn: "Gingelly Oil (Sugarcane added)",
     descriptionTa: "மென்மையான மணம், ஆரோக்கியத்திற்கு நல்லது.",
     descriptionEn: "Aromatic and healthy cold-pressed sesame oil.",
-    imageUrl: "/images/sesame.svg",
+    imageUrl: "/images/gingelly_sugarcane.jpg",
     pricePaisa: 52000,
     unit: "1L",
     variants: [
@@ -49,12 +49,12 @@ export const sampleProducts: Product[] = [
   },
   {
     id: "3",
-    slug: "kadugu-500ml",
-    nameTa: "கடுகு எண்ணெய்",
-    nameEn: "Mustard Oil",
+    slug: "gingelly-oil-jaggery",
+    nameTa: "எள்ளெண்ணெய் (வெல்லம் சேர்க்கப்பட்டது)",
+    nameEn: "Gingelly Oil (Jaggery added)",
     descriptionTa: "சிறந்த சுவை மற்றும் குணம்.",
     descriptionEn: "Great flavor and properties.",
-    imageUrl: "/images/mustard.svg",
+    imageUrl: "/images/gingelly_jaggery.jpg",
     pricePaisa: 28000,
     unit: "500ml",
     variants: [
@@ -70,7 +70,7 @@ export const sampleProducts: Product[] = [
     nameEn: "Coconut Oil",
     descriptionTa: "பசுமை மற்றும் சுவை.",
     descriptionEn: "Fresh and tasty cold-pressed coconut oil.",
-    imageUrl: "/images/groundnut.svg",
+    imageUrl: "/images/coconut.jpg",
     pricePaisa: 42000,
     unit: "1L",
     variants: [

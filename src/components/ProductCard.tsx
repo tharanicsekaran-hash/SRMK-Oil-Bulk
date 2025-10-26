@@ -24,13 +24,13 @@ export default function ProductCard({ p }: { p: Product }) {
   return (
     <div className="group h-full flex flex-col rounded-xl border shadow-sm overflow-hidden bg-white transition hover:shadow-md hover:-translate-y-0.5">
       <div className="p-4">
-        <div className="relative aspect-[16/9] w-full overflow-hidden rounded-xl bg-gradient-to-br from-amber-50 to-amber-100">
+        <div className="relative aspect-[3/4] md:aspect-[4/5] w-full overflow-hidden rounded-xl bg-gradient-to-br from-amber-50 to-amber-100">
           {p.imageUrl && (
             <Image
               src={p.imageUrl}
               alt={name}
               fill
-              className="object-cover transition-transform duration-300 group-hover:scale-[1.02]"
+              className="object-contain p-3 transition-transform duration-300 group-hover:scale-[1.01]"
               sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
               priority={false}
             />

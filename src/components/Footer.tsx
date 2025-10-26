@@ -26,7 +26,7 @@ export default function Footer() {
           </div>
         </div>
       </div>
-      <div className="text-center text-xs text-gray-500 pb-6">© {new Date().getFullYear()} SRMK Oil Mill</div>
+      <div className="text-center text-xs text-gray-500 pb-6">© {new Date().getFullYear()} SRMK Oil Millsss</div>
     </footer>
   );
 }
