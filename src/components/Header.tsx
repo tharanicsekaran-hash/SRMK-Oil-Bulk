@@ -20,7 +20,7 @@ export default function Header() {
         <nav className="hidden md:flex items-center gap-4 text-sm">
           <Link href="/" className="hover:text-[#d97706]">{t.nav.home}</Link>
           <Link href="/products" className="hover:text-[#d97706]">{t.nav.products}</Link>
-          <Link href="/about" className="hover:text-[#d97706]">About</Link>
+          <Link href="/about" className="hover:text-[#d97706]">{t.nav.about}</Link>
           <div className="h-5 w-px bg-gray-300" />
           <Link href="/account" className="inline-flex items-center justify-center p-2 rounded hover:bg-gray-100" aria-label="Profile">
             <User className="h-5 w-5" />
@@ -69,7 +69,7 @@ export default function Header() {
           <div className="max-w-6xl mx-auto px-4 py-3 flex flex-col gap-3">
             <Link href="/" className="py-1 hover:text-[#d97706]" onClick={() => setOpen(false)}>{t.nav.home}</Link>
             <Link href="/products" className="py-1 hover:text-[#d97706]" onClick={() => setOpen(false)}>{t.nav.products}</Link>
-            <Link href="/about" className="py-1 hover:text-[#d97706]" onClick={() => setOpen(false)}>About</Link>
+            <Link href="/about" className="py-1 hover:text-[#d97706]" onClick={() => setOpen(false)}>{t.nav.about}</Link>
           </div>
         </div>
       )}

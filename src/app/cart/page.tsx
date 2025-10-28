@@ -41,14 +41,15 @@ export default function CartPage() {
         </div>
       ) : (
         <div className="flex flex-col gap-4">
-          {items.map((i) => (
+          {items.map((i) => {
+            const p = sampleProducts.find((sp) => sp.id === i.id || sp.slug === i.slug);
+            const imageSrc = i.imageUrl || p?.imageUrl || "/images/groundnut.jpg";
+            return (
             <div key={`${i.id}-${i.unit}`} className="flex items-center justify-between border rounded p-3">
               <div className="flex items-center gap-3">
-                {i.imageUrl && (
-                  <div className="relative h-12 w-12 overflow-hidden rounded-md bg-amber-50">
-                    <Image src={i.imageUrl} alt={i.name} fill className="object-cover" />
-                  </div>
-                )}
+                <div className="relative h-12 w-12 overflow-hidden rounded-md bg-amber-50">
+                  <Image src={imageSrc} alt={i.name} fill className="object-cover" />
+                </div>
                 <div className="flex flex-col">
                   <div className="font-medium">{i.name}</div>
                   <div className="text-sm text-gray-600">{i.unit} · {formatPricePaisa(i.pricePaisa, locale)}</div>
@@ -65,7 +66,8 @@ export default function CartPage() {
                 <button className="text-red-600" onClick={() => remove(i.id, i.unit)}>×</button>
               </div>
             </div>
-          ))}
+            );
+          })}
           <div className="space-y-1 border-t pt-4">
             <div className="flex items-center justify-between">
               <div className="text-sm text-gray-600">{t.cart.subtotal}</div>

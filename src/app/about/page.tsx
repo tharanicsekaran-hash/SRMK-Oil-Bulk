@@ -1,5 +1,6 @@
 "use client";
 import { motion } from "framer-motion";
+import { useI18n } from "@/components/LanguageProvider";
 import { fadeUp, stagger } from "@/lib/animations";
 
 const testimonials = [
@@ -18,24 +19,23 @@ const testimonials = [
 ];
 
 export default function AboutPage() {
+  const { t } = useI18n();
   return (
     <div className="max-w-6xl mx-auto px-4 py-10 space-y-12">
       <section>
         <motion.div variants={stagger()} initial="hidden" animate="show">
           <motion.h1 variants={fadeUp} className="text-3xl font-bold mb-3">
-            About SRMK Oil Mill
+            {t.about.title}
           </motion.h1>
           <motion.p variants={fadeUp} className="text-gray-700 max-w-3xl">
-            We are committed to producing pure, traditional, cold-pressed oils using
-            high-quality seeds and careful extraction methods. Our focus is on
-            freshness, authenticity, and customer trust.
+            {t.home.heroSubtitle}
           </motion.p>
         </motion.div>
       </section>
 
       <section>
         <motion.div variants={stagger()} initial="hidden" animate="show" className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {["Pure Ingredients", "Traditional Process", "Trusted by Families"].map((title, i) => (
+          {[t.about.features.one, t.about.features.two, t.about.features.three].map((title, i) => (
             <motion.div key={i} variants={fadeUp} className="rounded-lg border p-5 bg-white">
               <div className="text-lg font-semibold mb-1">{title}</div>
               <div className="text-sm text-gray-600">
@@ -48,7 +48,7 @@ export default function AboutPage() {
 
       <section>
         <motion.h2 variants={fadeUp} initial="hidden" animate="show" className="text-2xl font-semibold mb-4">
-          Testimonials
+          {t.about.testimonialsTitle}
         </motion.h2>
         <motion.div variants={stagger()} initial="hidden" animate="show" className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {testimonials.map((t, idx) => (
