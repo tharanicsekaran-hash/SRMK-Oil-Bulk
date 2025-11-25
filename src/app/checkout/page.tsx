@@ -7,7 +7,7 @@ import { formatPricePaisa } from "@/lib/products";
 import { useRouter } from "next/navigation";
 
 export default function CheckoutPage() {
-  const { t, locale } = useI18n();
+  const { locale } = useI18n();
   const router = useRouter();
   const { items, clear } = useCart();
   const [name, setName] = useState("");
@@ -57,7 +57,7 @@ export default function CheckoutPage() {
       if (!res.ok) throw new Error("Order failed / ஆர்டர் தோல்வியடைந்தது");
       clear();
       router.push("/account");
-    } catch (e) {
+    } catch {
       alert("Failed to place order. Please try again. / ஆர்டர் செய்ய தவறிவிட்டது. மீண்டும் முயற்சிக்கவும்.");
     }
   };

@@ -1,19 +1,26 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { useI18n } from "@/components/LanguageProvider";
+import Image from "next/image";
 
 export type LatLng = { lat: number; lng: number };
+
+declare global {
+  interface Window {
+    google?: typeof google;
+  }
+}
 
 let mapsLoaderPromise: Promise<void> | null = null;
 
 async function loadGoogleMaps(apiKey: string): Promise<void> {
   if (typeof window === "undefined") return;
-  if ((window as any).google?.maps?.places) return;
+  if (window.google?.maps?.places) return;
   if (mapsLoaderPromise) return mapsLoaderPromise;
 
   const src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey)}&libraries=places&v=weekly`;
   
-  return new Promise((resolve, reject) => {
+  mapsLoaderPromise = new Promise((resolve, reject) => {
     const existing = document.querySelector<HTMLScriptElement>("script[data-google-maps]");
     if (existing) {
       existing.addEventListener("load", () => resolve());
@@ -30,6 +37,8 @@ async function loadGoogleMaps(apiKey: string): Promise<void> {
     script.onerror = () => reject(new Error("Google Maps failed to load"));
     document.head.appendChild(script);
   });
+  
+  return mapsLoaderPromise;
 }
 
 export default function MapPicker({ 
@@ -178,9 +187,11 @@ export default function MapPicker({
           {isLoading ? (
             <span className="h-5 w-5 animate-spin">⟳</span>
           ) : (
-            <img 
+            <Image 
               src="/location-pin.png"
               alt="Location"
+              width={40}
+              height={40}
               className="w-10 h-10"
               aria-hidden="true"
             />
