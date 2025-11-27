@@ -1,7 +1,34 @@
 import { NextResponse } from "next/server";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
-// Create order
+// GET - Fetch user's orders
+export async function GET() {
+  try {
+    const session = await getServerSession(authOptions);
+
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const orders = await prisma.order.findMany({
+      where: { userId: session.user.id },
+      include: { items: true },
+      orderBy: { createdAt: "desc" },
+    });
+
+    return NextResponse.json({ orders });
+  } catch (error) {
+    console.error("Fetch orders error:", error);
+    return NextResponse.json(
+      { error: "Failed to fetch orders" },
+      { status: 500 }
+    );
+  }
+}
+
+// POST - Create order
 export async function POST(req: Request) {
   try {
     const body = await req.json();
@@ -39,8 +66,12 @@ export async function POST(req: Request) {
 
     const totalPaisa = items.reduce((s, i) => s + i.pricePaisa * i.qty, 0);
 
+    // Get session to link order to user if logged in
+    const session = await getServerSession(authOptions);
+
     const order = await prisma.order.create({
       data: {
+        userId: session?.user?.id || null,
         status: "PENDING",
         paymentMethod,
         totalPaisa,

@@ -1,5 +1,6 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSession } from "next-auth/react";
 import MapPicker, { type LatLng } from "@/components/MapPicker";
 import { useI18n } from "@/components/LanguageProvider";
 import { useCart } from "@/store/cart";
@@ -10,24 +11,89 @@ export default function CheckoutPage() {
   const { locale } = useI18n();
   const router = useRouter();
   const { items, clear } = useCart();
+  const { data: session } = useSession();
+  
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
-  const [addressLine1, setAddressLine1] = useState("");
-  const [addressLine2, setAddressLine2] = useState("");
+  const [addressLine, setAddressLine] = useState("");
+  const [pincode, setPincode] = useState("");
+  const [city, setCity] = useState("");
+  const [isLoadingCity, setIsLoadingCity] = useState(false);
   const [location, setLocation] = useState<LatLng | undefined>();
   const [paymentMethod, setPaymentMethod] = useState<"COD">("COD");
   const [comments, setComments] = useState("");
+  const [saveAddress, setSaveAddress] = useState(false);
 
   const subtotal = items.reduce((sum, i) => sum + i.pricePaisa * i.qty, 0);
   const deliveryChargePaisa = subtotal < 50000 ? 5000 : 0;
   const totalPaisa = subtotal + deliveryChargePaisa;
 
+  // Pre-fill user data from session
+  useEffect(() => {
+    if (session?.user) {
+      if (session.user.name) setName(session.user.name);
+      if (session.user.phone) setPhone(session.user.phone);
+    }
+  }, [session]);
+
+  const fetchCityFromPincode = async (pin: string) => {
+    if (pin.length !== 6) return;
+    
+    setIsLoadingCity(true);
+    try {
+      console.log("Fetching city for pincode:", pin);
+      const response = await fetch(`/api/geocode?pincode=${pin}`);
+      const data = await response.json();
+      console.log("Geocode API response:", data);
+      
+      if (response.ok && data.success && data.city) {
+        console.log("Found city:", data.city);
+        setCity(data.city);
+      } else {
+        console.error("Failed to fetch city:", data.error);
+        // Allow user to manually enter city if auto-fill fails
+      }
+    } catch (error) {
+      console.error("Error fetching city from pincode:", error);
+    } finally {
+      setIsLoadingCity(false);
+    }
+  };
+
+  const handlePincodeChange = (value: string) => {
+    const numericValue = value.replace(/\D/g, "").slice(0, 6);
+    setPincode(numericValue);
+    
+    if (numericValue.length === 6) {
+      fetchCityFromPincode(numericValue);
+    } else {
+      setCity("");
+    }
+  };
+
   const placeOrder = async () => {
-    if (!name || !phone || !addressLine1) {
+    if (!name || !phone || !addressLine || !pincode || !city) {
       alert("Please fill all required fields / தயவுசெய்து அனைத்து தேவையான புலங்களையும் நிரப்பவும்");
       return;
     }
+
     try {
+      // Save address if checkbox is checked and user is logged in
+      if (saveAddress && session?.user?.id) {
+        await fetch("/api/addresses", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            line1: addressLine,
+            city,
+            postalCode: pincode,
+            state: "",
+            lat: location?.lat,
+            lng: location?.lng,
+          }),
+        });
+      }
+
       const res = await fetch("/api/orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -42,11 +108,11 @@ export default function CheckoutPage() {
           })),
           customerName: name,
           customerPhone: phone,
-          addressLine1,
-          addressLine2,
-          city: "",
+          addressLine1: addressLine,
+          addressLine2: "",
+          city,
           state: "",
-          postalCode: "",
+          postalCode: pincode,
           lat: location?.lat,
           lng: location?.lng,
           notes: comments,
@@ -94,22 +160,55 @@ export default function CheckoutPage() {
             <div className="grid gap-3">
               <input 
                 className="border rounded px-3 py-2" 
-                placeholder="Address line 1 / முகவரி வரி 1 *" 
-                value={addressLine1} 
-                onChange={(e) => setAddressLine1(e.target.value)} 
+                placeholder="Address line / முகவரி வரி *" 
+                value={addressLine} 
+                onChange={(e) => setAddressLine(e.target.value)} 
                 required
               />
               <input 
                 className="border rounded px-3 py-2" 
-                placeholder="Address line 2 / முகவரி வரி 2 (optional)" 
-                value={addressLine2} 
-                onChange={(e) => setAddressLine2(e.target.value)} 
+                placeholder="Pincode / பின் குறியீடு *" 
+                value={pincode} 
+                onChange={(e) => handlePincodeChange(e.target.value)} 
+                required
+                maxLength={6}
+                inputMode="numeric"
               />
+              <input 
+                className={`border rounded px-3 py-2 ${isLoadingCity ? 'bg-gray-50' : ''}`}
+                placeholder="City / நகரம் *" 
+                value={city} 
+                onChange={(e) => setCity(e.target.value)}
+                required
+                disabled={isLoadingCity}
+              />
+              {isLoadingCity && (
+                <p className="text-xs text-gray-500">Loading city... / நகரம் ஏற்றப்படுகிறது...</p>
+              )}
             </div>
-            <div className="space-y-2 pt-2">
-              <div className="font-medium">Delivery Location (Optional) / விநியோக இடம் (விருப்பமானது)</div>
-              <MapPicker value={location} onChange={setLocation} />
-            </div>
+            {session && (
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={saveAddress}
+                  onChange={(e) => setSaveAddress(e.target.checked)}
+                  className="rounded"
+                />
+                {locale === "en"
+                  ? "Save this address to my account"
+                  : "இந்த முகவரியை எனது கணக்கில் சேமிக்கவும்"}
+              </label>
+            )}
+          </div>
+
+          <div className="border rounded p-4 space-y-4">
+            <div className="font-medium">Delivery Location (Optional) / விநியோக இடம் (விருப்பமானது)</div>
+            {location && (
+              <p className="text-xs text-green-600">
+                ✓ Location set: {location.lat.toFixed(6)}, {location.lng.toFixed(6)}
+              </p>
+            )}
+            <MapPicker value={location} onChange={setLocation} />
           </div>
 
           <div className="border rounded p-4 space-y-3">

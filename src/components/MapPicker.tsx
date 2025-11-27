@@ -72,15 +72,21 @@ export default function MapPicker({
           lng: position.coords.longitude
         };
         
+        console.log("Current location obtained:", pos);
+        
+        // Always call onChange to update parent component
+        onChange(pos);
+        
+        // Update map if it's initialized
         if (mapInstance.current) {
           mapInstance.current.setCenter(pos);
           mapInstance.current.setZoom(16);
           markerRef.current?.setPosition(pos);
-          onChange(pos);
         }
         setIsLoading(false);
       },
       (error) => {
+        console.error("Geolocation error:", error);
         setError(`Unable to retrieve your location: ${error.message}`);
         setIsLoading(false);
       },
