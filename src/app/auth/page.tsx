@@ -48,13 +48,15 @@ function AuthContent() {
 
       if (result?.error) {
         showToast(result.error, "error");
-      } else {
+      } else if (result?.ok) {
         showToast(
           locale === "en" ? "Login successful!" : "உள்நுழைவு வெற்றிகரமாக!",
           "success"
         );
-        router.push(redirectUrl);
-        router.refresh();
+        // Use window.location for hard redirect to ensure session is loaded
+        setTimeout(() => {
+          window.location.href = redirectUrl;
+        }, 500);
       }
     } catch {
       showToast(
