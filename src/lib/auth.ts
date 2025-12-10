@@ -33,10 +33,16 @@ export const authOptions: NextAuthOptions = {
           throw new Error("Invalid password");
         }
 
+        // Check if user is active
+        if (!user.isActive) {
+          throw new Error("Account has been deactivated");
+        }
+
         return {
           id: user.id,
           phone: user.phone,
           name: user.name,
+          role: user.role,
         };
       },
     }),
@@ -52,6 +58,8 @@ export const authOptions: NextAuthOptions = {
       if (user) {
         token.id = user.id;
         token.phone = user.phone;
+        token.name = user.name;
+        token.role = user.role;
       }
       return token;
     },
@@ -59,6 +67,8 @@ export const authOptions: NextAuthOptions = {
       if (token && session.user) {
         session.user.id = token.id as string;
         session.user.phone = token.phone as string;
+        session.user.name = token.name as string;
+        session.user.role = token.role as string;
       }
       return session;
     },

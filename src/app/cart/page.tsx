@@ -5,11 +5,66 @@ import { useI18n } from "@/components/LanguageProvider";
 import { formatPricePaisa } from "@/lib/products";
 import Image from "next/image";
 import ProductCard from "@/components/ProductCard";
-import { sampleProducts } from "@/lib/products";
+import { useState, useEffect, useMemo } from "react";
+
+type Product = {
+  id: string;
+  slug: string;
+  nameTa: string;
+  nameEn: string;
+  descriptionTa?: string;
+  descriptionEn?: string;
+  imageUrl?: string;
+  pricePaisa: number;
+  unit: string;
+  inStock: boolean;
+  stockQuantity: number;
+  discount: number;
+  category?: string;
+};
 
 export default function CartPage() {
   const { t, locale } = useI18n();
   const { items, remove, setQty } = useCart();
+  const [products, setProducts] = useState<Product[]>([]);
+
+  useEffect(() => {
+    fetchProducts();
+  }, []);
+
+  const fetchProducts = async () => {
+    try {
+      const res = await fetch("/api/products");
+      if (res.ok) {
+        const data = await res.json();
+        setProducts(data);
+      }
+    } catch (error) {
+      console.error("Failed to fetch products:", error);
+    }
+  };
+
+  // Group products by name
+  const groupedProducts = useMemo(() => {
+    const groups = new Map<string, Product[]>();
+    
+    products.forEach((p) => {
+      const key = p.nameEn;
+      if (!groups.has(key)) {
+        groups.set(key, []);
+      }
+      groups.get(key)!.push(p);
+    });
+
+    groups.forEach((variants) => {
+      variants.sort((a, b) => {
+        const order = { "500ml": 1, "1L": 2, "2L": 3 };
+        return (order[a.unit as keyof typeof order] || 99) - (order[b.unit as keyof typeof order] || 99);
+      });
+    });
+
+    return Array.from(groups.values());
+  }, [products]);
 
   const subtotal = items.reduce((sum, i) => sum + i.pricePaisa * i.qty, 0);
   const deliveryChargePaisa = subtotal < 50000 ? 5000 : 0;
@@ -31,9 +86,9 @@ export default function CartPage() {
           <div className="mt-10">
             <h3 className="text-lg font-semibold mb-4 text-[#d97706]">Popular Picks</h3>
             <div className="grid auto-rows-fr items-stretch grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {sampleProducts.slice(0,3).map((p) => (
-                <div key={p.id} className="h-full">
-                  <ProductCard p={p} />
+              {groupedProducts.slice(0, 3).map((variants) => (
+                <div key={variants[0].id} className="h-full">
+                  <ProductCard variants={variants} />
                 </div>
               ))}
             </div>
@@ -42,7 +97,7 @@ export default function CartPage() {
       ) : (
         <div className="flex flex-col gap-4">
           {items.map((i) => {
-            const p = sampleProducts.find((sp) => sp.id === i.id || sp.slug === i.slug);
+            const p = products.find((sp) => sp.id === i.id || sp.slug === i.slug);
             const imageSrc = i.imageUrl || p?.imageUrl || "/images/groundnut.jpg";
             return (
             <div key={`${i.id}-${i.unit}`} className="flex items-center justify-between border rounded p-3">

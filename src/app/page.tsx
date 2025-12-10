@@ -2,17 +2,71 @@
 import Link from "next/link";
 import { useI18n } from "@/components/LanguageProvider";
 import ProductCard from "@/components/ProductCard";
-import { sampleProducts } from "@/lib/products";
 import { motion } from "framer-motion";
 import { fadeUp, stagger } from "@/lib/animations";
 import MotionInView from "@/components/MotionInView";
 import { ShieldCheck, Award, Truck, ShoppingBag } from "lucide-react";
 import Image from "next/image";
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
+
+type Product = {
+  id: string;
+  slug: string;
+  nameTa: string;
+  nameEn: string;
+  descriptionTa?: string;
+  descriptionEn?: string;
+  imageUrl?: string;
+  pricePaisa: number;
+  unit: string;
+  inStock: boolean;
+  stockQuantity: number;
+  discount: number;
+  category?: string;
+};
 
 export default function Home() {
   const { t } = useI18n();
   const [heroOk, setHeroOk] = useState(true);
+  const [products, setProducts] = useState<Product[]>([]);
+
+  useEffect(() => {
+    fetchProducts();
+  }, []);
+
+  const fetchProducts = async () => {
+    try {
+      const res = await fetch("/api/products");
+      if (res.ok) {
+        const data = await res.json();
+        setProducts(data);
+      }
+    } catch (error) {
+      console.error("Failed to fetch products:", error);
+    }
+  };
+
+  // Group products by name for display
+  const groupedProducts = useMemo(() => {
+    const groups = new Map<string, Product[]>();
+    
+    products.forEach((p) => {
+      const key = p.nameEn;
+      if (!groups.has(key)) {
+        groups.set(key, []);
+      }
+      groups.get(key)!.push(p);
+    });
+
+    groups.forEach((variants) => {
+      variants.sort((a, b) => {
+        const order = { "500ml": 1, "1L": 2, "2L": 3 };
+        return (order[a.unit as keyof typeof order] || 99) - (order[b.unit as keyof typeof order] || 99);
+      });
+    });
+
+    return Array.from(groups.values());
+  }, [products]);
   return (
     <>
       <section className="relative h-[420px] md:h-[520px] overflow-hidden">
@@ -50,8 +104,8 @@ export default function Home() {
           <MotionInView variants={stagger()}>
             <motion.h2 className="text-2xl font-bold mb-6 text-[#d97706]" variants={fadeUp}>{t.home.featuredTitle}</motion.h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-              {sampleProducts.map((p) => (
-                <ProductCard key={p.id} p={p} />
+              {groupedProducts.slice(0, 3).map((variants) => (
+                <ProductCard key={variants[0].id} variants={variants} />
               ))}
             </div>
             <motion.div className="text-center mt-8" variants={fadeUp}>

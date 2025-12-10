@@ -1,22 +1,37 @@
 "use client";
 import Link from "next/link";
 import Image from "next/image";
-import { formatPricePaisa, type Product } from "@/lib/products";
+import { formatPricePaisa } from "@/lib/products";
 import { useI18n } from "@/components/LanguageProvider";
 import { useCart } from "@/store/cart";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useToast } from "@/store/toast";
 
-export default function ProductCard({ p }: { p: Product }) {
+type Product = {
+  id: string;
+  slug: string;
+  nameTa: string;
+  nameEn: string;
+  descriptionTa?: string;
+  descriptionEn?: string;
+  imageUrl?: string;
+  pricePaisa: number;
+  unit: string;
+  inStock: boolean;
+  discount?: number;
+  offerTextTa?: string;
+  offerTextEn?: string;
+};
+
+export default function ProductCard({ variants }: { variants: Product[] }) {
   const { locale, t } = useI18n();
   const add = useCart((s) => s.add);
-  const name = locale === "ta" ? p.nameTa : p.nameEn;
-
-  const variants = useMemo(() => p.variants ?? [{ unit: p.unit, pricePaisa: p.pricePaisa }], [p]);
   const [activeIdx, setActiveIdx] = useState(0);
   const [qty, setQty] = useState(1);
-  const active = variants[activeIdx];
   const showToast = useToast((s) => s.show);
+
+  const p = variants[activeIdx]; // Currently selected variant
+  const name = locale === "ta" ? p.nameTa : p.nameEn;
 
   const dec = () => setQty((q) => Math.max(1, q - 1));
   const inc = () => setQty((q) => q + 1);
@@ -48,14 +63,18 @@ export default function ProductCard({ p }: { p: Product }) {
         <div className="space-y-1">
           <div className="text-xs text-gray-600">{t.product.size}:</div>
           <div className="flex flex-wrap gap-2">
-            {variants.map((v, i) => (
+            {variants.map((variant, i) => (
               <button
-                key={v.unit}
+                key={variant.id}
                 type="button"
-                className={`px-2 py-1 text-xs rounded border ${i === activeIdx ? "bg-orange-50 border-orange-400" : "hover:bg-gray-50"}`}
+                className={`px-3 py-1.5 text-sm rounded border transition-colors ${
+                  i === activeIdx
+                    ? "bg-orange-50 border-orange-400 text-orange-700 font-medium"
+                    : "border-gray-300 hover:bg-gray-50"
+                }`}
                 onClick={() => setActiveIdx(i)}
               >
-                {v.unit}
+                {variant.unit}
               </button>
             ))}
           </div>
@@ -71,19 +90,34 @@ export default function ProductCard({ p }: { p: Product }) {
         </div>
 
         <div className="mt-auto">
-          <div className="text-xl font-semibold text-[#d97706]">{formatPricePaisa(active.pricePaisa, locale)}</div>
+          <div className="flex items-baseline gap-2">
+            <div className="text-xl font-semibold text-[#d97706]">
+              {formatPricePaisa(p.pricePaisa, locale)}
+            </div>
+            {p.discount && p.discount > 0 && (
+              <span className="text-xs text-green-600 font-medium">
+                {p.discount}% OFF
+              </span>
+            )}
+          </div>
+          {p.offerTextEn && (
+            <p className="text-xs text-green-600 mt-1">
+              {locale === "ta" ? p.offerTextTa : p.offerTextEn}
+            </p>
+          )}
           <div className="mt-2 flex items-center gap-2">
             <Link href={`/products/${p.slug}`} className="px-3 py-2 text-sm rounded border hover:bg-gray-50">
               {t.product.details}
             </Link>
             <button
-              className="px-3.5 py-2.5 text-sm whitespace-nowrap rounded bg-[#d97706] text-white hover:bg-[#b76405] flex-1 text-center min-w-0"
+              className="px-3.5 py-2.5 text-sm whitespace-nowrap rounded bg-[#d97706] text-white hover:bg-[#b76405] flex-1 text-center min-w-0 disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={!p.inStock}
               onClick={() => {
-                add(p, qty, name, { pricePaisa: active.pricePaisa, unit: active.unit });
-                showToast(`${name} (${active.unit}) added to cart`);
+                add(p, qty, name, { pricePaisa: p.pricePaisa, unit: p.unit });
+                showToast(`${name} (${p.unit}) added to cart`);
               }}
             >
-              {t.actions.addToCart}
+              {p.inStock ? t.actions.addToCart : "Out of Stock"}
             </button>
           </div>
         </div>

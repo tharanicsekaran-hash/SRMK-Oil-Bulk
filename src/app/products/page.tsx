@@ -1,35 +1,102 @@
 "use client";
 import ProductCard from "@/components/ProductCard";
-import { sampleProducts } from "@/lib/products";
 import { useI18n } from "@/components/LanguageProvider";
 import { motion } from "framer-motion";
 import { fadeUp, stagger } from "@/lib/animations";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
+import { Loader2 } from "lucide-react";
+
+type Product = {
+  id: string;
+  slug: string;
+  nameTa: string;
+  nameEn: string;
+  descriptionTa?: string;
+  descriptionEn?: string;
+  imageUrl?: string;
+  pricePaisa: number;
+  unit: string;
+  inStock: boolean;
+  stockQuantity: number;
+  discount: number;
+  offerTextTa?: string;
+  offerTextEn?: string;
+  category?: string;
+  sku?: string;
+  isActive: boolean;
+};
 
 export default function ProductsPage() {
   const { t } = useI18n();
   const [q, setQ] = useState("");
   const [unit, setUnit] = useState<string>("all");
-  
+  const [products, setProducts] = useState<Product[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    fetchProducts();
+  }, []);
+
+  const fetchProducts = async () => {
+    try {
+      const res = await fetch("/api/products");
+      if (res.ok) {
+        const data = await res.json();
+        setProducts(data);
+      }
+    } catch (error) {
+      console.error("Failed to fetch products:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Group products by name (e.g., all sizes of "Coconut Oil" together)
+  const groupedProducts = useMemo(() => {
+    const groups = new Map<string, Product[]>();
+    
+    products.forEach((p) => {
+      const key = p.nameEn; // Group by English name
+      if (!groups.has(key)) {
+        groups.set(key, []);
+      }
+      groups.get(key)!.push(p);
+    });
+
+    // Sort variants by unit within each group
+    groups.forEach((variants) => {
+      variants.sort((a, b) => {
+        const order = { "500ml": 1, "1L": 2, "2L": 3 };
+        return (order[a.unit as keyof typeof order] || 99) - (order[b.unit as keyof typeof order] || 99);
+      });
+    });
+
+    return Array.from(groups.values());
+  }, [products]);
 
   const units = useMemo(() => {
     const u = new Set<string>();
-    sampleProducts.forEach((p) => {
+    products.forEach((p) => {
       if (p.unit) u.add(p.unit);
-      p.variants?.forEach((v) => u.add(v.unit));
     });
-    return Array.from(u);
-  }, []);
+    return Array.from(u).sort();
+  }, [products]);
 
-  const filtered = sampleProducts.filter((p) => {
+  const filtered = groupedProducts.filter((variants) => {
+    const p = variants[0]; // Use first variant for filtering
     const name = `${p.nameTa} ${p.nameEn}`.toLowerCase();
     if (q && !name.includes(q.toLowerCase())) return false;
-    if (unit !== "all") {
-      const match = p.unit === unit || p.variants?.some((v) => v.unit === unit);
-      if (!match) return false;
-    }
+    if (unit !== "all" && !variants.some(v => v.unit === unit)) return false;
     return true;
   });
+
+  if (isLoading) {
+    return (
+      <div className="max-w-6xl mx-auto px-4 py-6 flex items-center justify-center min-h-[400px]">
+        <Loader2 className="w-8 h-8 animate-spin text-[#d97706]" />
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-6">
@@ -58,12 +125,18 @@ export default function ProductsPage() {
         initial="hidden"
         animate="show"
       >
-        {filtered.map((p) => (
-          <motion.div key={p.id} variants={fadeUp}>
-            <ProductCard p={p} />
+        {filtered.map((variants) => (
+          <motion.div key={variants[0].id} variants={fadeUp}>
+            <ProductCard variants={variants} />
           </motion.div>
         ))}
       </motion.div>
+
+      {filtered.length === 0 && (
+        <div className="text-center py-12">
+          <p className="text-gray-600">No products found</p>
+        </div>
+      )}
     </div>
   );
 }
