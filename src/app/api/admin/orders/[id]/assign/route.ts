@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -15,7 +15,7 @@ export async function POST(
     }
 
     const { deliveryUserId } = await request.json();
-    const { id } = params;
+    const { id } = await params;
 
     // Verify delivery user exists and has DELIVERY role
     const deliveryUser = await prisma.user.findUnique({

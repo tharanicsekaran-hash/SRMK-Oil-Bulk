@@ -28,6 +28,7 @@ export default function AvailableOrdersPage() {
 
   useEffect(() => {
     fetchUnassignedOrders();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchUnassignedOrders = async () => {

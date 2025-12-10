@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useSession } from "next-auth/react";
 import { CheckCircle, Eye, X, MapPin, Phone, User } from "lucide-react";
 import { useToast } from "@/store/toast";
 
@@ -26,15 +25,15 @@ interface Order {
 }
 
 export default function AssignedOrdersPage() {
-  const { data: session } = useSession();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
-  const { showToast } = useToast();
+  const showToast = useToast((state) => state.show);
 
   useEffect(() => {
     fetchAssignedOrders();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchAssignedOrders = async () => {

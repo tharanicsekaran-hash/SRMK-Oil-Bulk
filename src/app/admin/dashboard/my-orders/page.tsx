@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useSession } from "next-auth/react";
 import { useToast } from "@/store/toast";
 import { Loader2, Package, MapPin, Phone, CheckCircle } from "lucide-react";
 
@@ -24,13 +23,13 @@ type Order = {
 };
 
 export default function MyOrdersPage() {
-  const { data: session } = useSession();
   const [orders, setOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const showToast = useToast((state) => state.show);
 
   useEffect(() => {
     fetchMyOrders();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchMyOrders = async () => {

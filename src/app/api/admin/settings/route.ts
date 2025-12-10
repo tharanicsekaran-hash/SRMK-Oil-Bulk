@@ -10,7 +10,7 @@ let settingsStore = {
   productCategories: "Cooking Oils\nWood Pressed Oils\nCold Pressed Oils\nOrganic Oils\nSpecialty Oils",
 };
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const session = await getServerSession(authOptions);
 

@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -14,7 +14,7 @@ export async function POST(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { id } = params;
+    const { id } = await params;
 
     // If delivery user, ensure they can only mark their own orders as delivered
     if (session.user.role === "DELIVERY") {
@@ -39,10 +39,10 @@ export async function POST(
     });
 
     return NextResponse.json(order);
-  } catch (error: any) {
+  } catch (error) {
     console.error("Mark delivered error:", error);
 
-    if (error.code === "P2025") {
+    if ((error as { code?: string }).code === "P2025") {
       return NextResponse.json({ error: "Order not found" }, { status: 404 });
     }
 

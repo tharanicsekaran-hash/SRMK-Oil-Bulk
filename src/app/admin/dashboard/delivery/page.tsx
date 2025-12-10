@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useToast } from "@/store/toast";
-import { Plus, Edit, Trash2, Loader2, X, Truck, CheckCircle, XCircle } from "lucide-react";
+import { Plus, Loader2, X, Truck, CheckCircle, XCircle } from "lucide-react";
 
 type DeliveryUser = {
   id: string;
@@ -28,6 +28,7 @@ export default function DeliveryManagementPage() {
 
   useEffect(() => {
     fetchDeliveryUsers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchDeliveryUsers = async () => {

@@ -1,7 +1,7 @@
 "use client";
 import { useState, Suspense } from "react";
 import { signIn } from "next-auth/react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { useI18n } from "@/components/LanguageProvider";
 import { useToast } from "@/store/toast";
 
@@ -9,7 +9,6 @@ type Tab = "login" | "signup" | "forgot";
 type ForgotStep = "phone" | "otp" | "password";
 
 function AuthContent() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const redirectUrl = searchParams.get("redirect") || "/account";
   const { locale } = useI18n();

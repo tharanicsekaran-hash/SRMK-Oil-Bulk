@@ -6,7 +6,7 @@ import { prisma } from "@/lib/prisma";
 // PUT update product (Admin only)
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -16,7 +16,7 @@ export async function PUT(
     }
 
     const data = await request.json();
-    const { id } = params;
+    const { id } = await params;
 
     // Check if product exists
     const existing = await prisma.product.findUnique({
@@ -73,7 +73,7 @@ export async function PUT(
 // DELETE product (Admin only)
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -82,7 +82,7 @@ export async function DELETE(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { id } = params;
+    const { id } = await params;
 
     await prisma.product.delete({
       where: { id },

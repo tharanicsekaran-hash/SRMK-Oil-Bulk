@@ -24,10 +24,12 @@ export default function CustomersPage() {
 
   useEffect(() => {
     fetchCustomers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
     filterCustomers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchQuery, customers]);
 
   const fetchCustomers = async () => {

@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { useToast } from "@/store/toast";
 import {
   Search,
-  Filter,
   Eye,
   UserCheck,
   CheckCircle,
@@ -13,8 +12,6 @@ import {
   MapPin,
   Phone,
   Package,
-  Calendar,
-  DollarSign,
 } from "lucide-react";
 
 type Order = {
@@ -65,10 +62,12 @@ export default function OrdersPage() {
   useEffect(() => {
     fetchOrders();
     fetchDeliveryUsers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
     filterOrders();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchQuery, statusFilter, deliveryStatusFilter, assignedToFilter, pincodeFilter, orders]);
 
   const fetchOrders = async () => {

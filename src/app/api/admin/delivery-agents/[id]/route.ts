@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -15,7 +15,7 @@ export async function PATCH(
     }
 
     const { isActive } = await request.json();
-    const { id } = params;
+    const { id } = await params;
 
     const agent = await prisma.user.update({
       where: { id },
@@ -30,10 +30,10 @@ export async function PATCH(
     });
 
     return NextResponse.json(agent);
-  } catch (error: any) {
+  } catch (error) {
     console.error("PATCH delivery agent error:", error);
 
-    if (error.code === "P2025") {
+    if ((error as { code?: string }).code === "P2025") {
       return NextResponse.json(
         { error: "Delivery agent not found" },
         { status: 404 }

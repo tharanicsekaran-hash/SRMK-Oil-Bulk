@@ -10,9 +10,6 @@ import {
   Loader2,
   X,
   Package,
-  DollarSign,
-  Tag,
-  BarChart3,
 } from "lucide-react";
 
 type Product = {
@@ -70,10 +67,12 @@ export default function ProductsPage() {
 
   useEffect(() => {
     fetchProducts();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
     filterProducts();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchQuery, categoryFilter, products]);
 
   const fetchProducts = async () => {
@@ -279,6 +278,7 @@ export default function ProductsPage() {
             {/* Product Image */}
             <div className="aspect-square bg-gray-100 relative">
               {product.imageUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={product.imageUrl}
                   alt={product.nameEn}
