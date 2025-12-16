@@ -2,8 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { Resend } from "resend";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
-
 // This endpoint is called by the order creation API to send email notifications
 export async function POST(request: NextRequest) {
   try {
@@ -89,6 +87,9 @@ SRMK Oil Mill - Admin Notification
     if (process.env.RESEND_API_KEY) {
       try {
         console.log("📧 Attempting to send email via Resend...");
+        
+        // Initialize Resend with API key (only when needed)
+        const resend = new Resend(process.env.RESEND_API_KEY);
         
         const { data, error } = await resend.emails.send({
           from: "SRMK Oil Mill <orders@srmkoilmill.in>",
