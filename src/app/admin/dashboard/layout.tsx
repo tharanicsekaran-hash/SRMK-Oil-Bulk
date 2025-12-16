@@ -28,6 +28,12 @@ type SidebarItem = {
   roles: ("ADMIN" | "DELIVERY")[];
 };
 
+type Order = {
+  id: string;
+  deliveryStatus: string;
+  // Add other fields as needed
+};
+
 const sidebarItems: SidebarItem[] = [
   {
     label: "Dashboard",
@@ -115,8 +121,8 @@ export default function AdminDashboardLayout({ children }: AdminLayoutProps) {
     try {
       const res = await fetch("/api/admin/orders");
       if (res.ok) {
-        const data = await res.json();
-        const pendingCount = data.filter((order: any) => 
+        const data = (await res.json()) as Order[];
+        const pendingCount = data.filter((order) => 
           order.deliveryStatus === "PENDING"
         ).length;
         localStorage.setItem("adminLastSeenOrders", pendingCount.toString());
@@ -136,8 +142,8 @@ export default function AdminDashboardLayout({ children }: AdminLayoutProps) {
         try {
           const res = await fetch("/api/admin/orders");
           if (res.ok) {
-            const data = await res.json();
-            const currentPendingCount = data.filter((order: any) => 
+            const data = (await res.json()) as Order[];
+            const currentPendingCount = data.filter((order) => 
               order.deliveryStatus === "PENDING"
             ).length;
             localStorage.setItem("adminLastSeenOrders", currentPendingCount.toString());
@@ -160,8 +166,8 @@ export default function AdminDashboardLayout({ children }: AdminLayoutProps) {
       try {
         const res = await fetch("/api/admin/orders");
         if (res.ok) {
-          const data = await res.json();
-          const currentPendingCount = data.filter((order: any) => 
+          const data = (await res.json()) as Order[];
+          const currentPendingCount = data.filter((order) => 
             order.deliveryStatus === "PENDING"
           ).length;
           
@@ -280,8 +286,8 @@ export default function AdminDashboardLayout({ children }: AdminLayoutProps) {
                       try {
                         const res = await fetch("/api/admin/orders");
                         if (res.ok) {
-                          const data = await res.json();
-                          const currentPendingCount = data.filter((order: any) => 
+                          const data = (await res.json()) as Order[];
+                          const currentPendingCount = data.filter((order) => 
                             order.deliveryStatus === "PENDING"
                           ).length;
                           localStorage.setItem("adminLastSeenOrders", currentPendingCount.toString());

@@ -220,7 +220,7 @@ export default function AddressModal({
                 {locale === "en" ? "Use current location" : "தற்போதைய இருப்பிடத்தைப் பயன்படுத்து"}
               </button>
             </div>
-            <MapPicker location={location} onChange={setLocation} />
+            <MapPicker value={location} onChange={setLocation} />
           </div>
 
           {/* Set as Default */}
