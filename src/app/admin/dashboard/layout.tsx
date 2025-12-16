@@ -2,7 +2,7 @@
 
 import { useSession, signOut } from "next-auth/react";
 import { usePathname, useRouter } from "next/navigation";
-import { ReactNode, useState } from "react";
+import { ReactNode, useState, useEffect } from "react";
 import {
   LayoutDashboard,
   Package,
@@ -97,8 +97,96 @@ export default function AdminDashboardLayout({ children }: AdminLayoutProps) {
   const pathname = usePathname();
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [newOrdersCount, setNewOrdersCount] = useState(0);
 
   const userRole = session?.user?.role as "ADMIN" | "DELIVERY" | undefined;
+
+  // Load last seen count from localStorage
+  useEffect(() => {
+    const stored = localStorage.getItem("adminLastSeenOrders");
+    if (!stored) {
+      // First time - initialize with current count
+      fetchAndInitialize();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const fetchAndInitialize = async () => {
+    try {
+      const res = await fetch("/api/admin/orders");
+      if (res.ok) {
+        const data = await res.json();
+        const pendingCount = data.filter((order: any) => 
+          order.deliveryStatus === "PENDING"
+        ).length;
+        localStorage.setItem("adminLastSeenOrders", pendingCount.toString());
+        console.log("📊 Badge: Initialized with", pendingCount, "pending orders");
+      }
+    } catch (error) {
+      console.error("Failed to initialize orders count:", error);
+    }
+  };
+
+  // Clear badge when navigating to orders page directly
+  useEffect(() => {
+    if (pathname === "/admin/dashboard/orders") {
+      const clearBadge = async () => {
+        setNewOrdersCount(0);
+        
+        try {
+          const res = await fetch("/api/admin/orders");
+          if (res.ok) {
+            const data = await res.json();
+            const currentPendingCount = data.filter((order: any) => 
+              order.deliveryStatus === "PENDING"
+            ).length;
+            localStorage.setItem("adminLastSeenOrders", currentPendingCount.toString());
+            console.log("✅ Badge cleared (navigation): Last seen updated to", currentPendingCount);
+          }
+        } catch (error) {
+          console.error("Failed to update last seen count:", error);
+        }
+      };
+      
+      clearBadge();
+    }
+  }, [pathname]);
+
+  // Poll for new orders (Admin only)
+  useEffect(() => {
+    if (userRole !== "ADMIN") return;
+
+    const fetchNewOrdersCount = async () => {
+      try {
+        const res = await fetch("/api/admin/orders");
+        if (res.ok) {
+          const data = await res.json();
+          const currentPendingCount = data.filter((order: any) => 
+            order.deliveryStatus === "PENDING"
+          ).length;
+          
+          const lastSeenCount = parseInt(localStorage.getItem("adminLastSeenOrders") || "0");
+          
+          // Calculate new orders (difference between current and last seen)
+          const newCount = Math.max(0, currentPendingCount - lastSeenCount);
+          
+          console.log(`🔔 Badge: Current=${currentPendingCount}, LastSeen=${lastSeenCount}, Badge=${newCount}`);
+          
+          setNewOrdersCount(newCount);
+        }
+      } catch (error) {
+        console.error("Failed to check orders:", error);
+      }
+    };
+
+    // Initial fetch
+    fetchNewOrdersCount();
+
+    // Poll every 30 seconds
+    const interval = setInterval(fetchNewOrdersCount, 30000);
+
+    return () => clearInterval(interval);
+  }, [userRole]);
 
   // Filter sidebar items based on user role
   const visibleItems = sidebarItems.filter((item) =>
@@ -175,22 +263,48 @@ export default function AdminDashboardLayout({ children }: AdminLayoutProps) {
             {visibleItems.map((item) => {
               const Icon = item.icon;
               const isActive = pathname === item.href;
+              const showBadge = item.href === "/admin/dashboard/orders" && newOrdersCount > 0;
 
               return (
                 <button
                   key={item.href}
-                  onClick={() => {
+                  onClick={async () => {
                     router.push(item.href);
                     setSidebarOpen(false);
+                    
+                    // Clear badge when clicking Orders page
+                    if (item.href === "/admin/dashboard/orders") {
+                      setNewOrdersCount(0);
+                      
+                      // Update localStorage with current pending count
+                      try {
+                        const res = await fetch("/api/admin/orders");
+                        if (res.ok) {
+                          const data = await res.json();
+                          const currentPendingCount = data.filter((order: any) => 
+                            order.deliveryStatus === "PENDING"
+                          ).length;
+                          localStorage.setItem("adminLastSeenOrders", currentPendingCount.toString());
+                          console.log("✅ Badge cleared: Last seen updated to", currentPendingCount);
+                        }
+                      } catch (error) {
+                        console.error("Failed to update last seen count:", error);
+                      }
+                    }
                   }}
-                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors relative ${
                     isActive
                       ? "bg-blue-50 text-blue-600 font-medium"
                       : "text-gray-700 hover:bg-gray-100"
                   }`}
                 >
                   <Icon className="w-5 h-5" />
-                  <span className="text-sm">{item.label}</span>
+                  <span className="text-sm flex-1 text-left">{item.label}</span>
+                  {showBadge && (
+                    <span className="bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full min-w-[20px] text-center">
+                      {newOrdersCount}
+                    </span>
+                  )}
                 </button>
               );
             })}

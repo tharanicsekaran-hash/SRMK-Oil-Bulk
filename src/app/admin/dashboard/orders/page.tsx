@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useToast } from "@/store/toast";
 import {
   Search,
@@ -12,6 +12,10 @@ import {
   MapPin,
   Phone,
   Package,
+  Copy,
+  Map,
+  Volume2,
+  VolumeX,
 } from "lucide-react";
 
 type Order = {
@@ -21,8 +25,13 @@ type Order = {
   totalPaisa: number;
   customerName?: string;
   customerPhone?: string;
+  addressLine1?: string;
+  addressLine2?: string;
   city?: string;
+  state?: string;
   postalCode?: string;
+  lat?: number | null;
+  lng?: number | null;
   assignedToId?: string;
   assignedTo?: { name?: string };
   createdAt: string;
@@ -56,12 +65,39 @@ export default function OrdersPage() {
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
   const [selectedDeliveryUser, setSelectedDeliveryUser] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // Notification state - using useRef to persist across renders
+  const lastOrderCountRef = useRef<number>(0);
+  const isInitializedRef = useRef<boolean>(false);
+  const [soundEnabled, setSoundEnabled] = useState(true);
 
   const showToast = useToast((state) => state.show);
 
   useEffect(() => {
     fetchOrders();
     fetchDeliveryUsers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Polling for new orders every 30 seconds - only start after initialization
+  useEffect(() => {
+    // Wait a bit for initial load to complete
+    const startPolling = setTimeout(() => {
+      console.log("🔄 Starting polling for new orders (every 30 seconds)...");
+      
+      const interval = setInterval(() => {
+        fetchOrdersQuietly();
+      }, 30000); // 30 seconds
+
+      return () => {
+        console.log("⏹️  Stopping polling");
+        clearInterval(interval);
+      };
+    }, 5000); // Start polling 5 seconds after component mount
+
+    return () => {
+      clearTimeout(startPolling);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -76,6 +112,13 @@ export default function OrdersPage() {
       if (res.ok) {
         const data = await res.json();
         setOrders(data);
+        // Initialize the count on first load
+        if (!isInitializedRef.current) {
+          lastOrderCountRef.current = data.length;
+          isInitializedRef.current = true;
+          console.log("📊 Initial order count:", data.length);
+          console.log("✅ Order tracking initialized");
+        }
       } else {
         showToast("Failed to load orders", "error");
       }
@@ -85,6 +128,72 @@ export default function OrdersPage() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const fetchOrdersQuietly = async () => {
+    // Don't check if not initialized yet
+    if (!isInitializedRef.current) {
+      console.log("⏳ Skipping check - not initialized yet");
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/admin/orders");
+      if (res.ok) {
+        const data = await res.json();
+        const currentCount = data.length;
+        const previousCount = lastOrderCountRef.current;
+        
+        console.log(`🔍 [${new Date().toLocaleTimeString()}] Checking orders: Previous=${previousCount}, Current=${currentCount}`);
+        
+        // Check if there are new orders
+        if (currentCount > previousCount) {
+          const newOrders = currentCount - previousCount;
+          
+          console.log(`🎉 NEW ORDERS DETECTED: ${newOrders} new order(s)!`);
+          console.log(`🔊 Sound enabled: ${soundEnabled}`);
+          
+          // Show toast notification
+          showToast(
+            `🎉 ${newOrders} new order${newOrders > 1 ? "s" : ""} received!`,
+            "success"
+          );
+          
+          // Play notification sound
+          if (soundEnabled) {
+            console.log("🔔 Playing notification sound...");
+            playNotificationSound();
+          }
+          
+          // Update the count
+          lastOrderCountRef.current = currentCount;
+        }
+        
+        // Update orders list
+        setOrders(data);
+      }
+    } catch (error) {
+      console.error("❌ Failed to fetch orders quietly:", error);
+    }
+  };
+
+  const playNotificationSound = () => {
+    // Create a simple beep sound using Web Audio API
+    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+    
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+    
+    oscillator.frequency.value = 800; // Frequency in Hz
+    oscillator.type = "sine";
+    
+    gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+    
+    oscillator.start(audioContext.currentTime);
+    oscillator.stop(audioContext.currentTime + 0.3);
   };
 
   const fetchDeliveryUsers = async () => {
@@ -214,6 +323,21 @@ export default function OrdersPage() {
     }
   };
 
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text).then(
+      () => {
+        showToast("Address copied to clipboard!", "success");
+      },
+      () => {
+        showToast("Failed to copy address", "error");
+      }
+    );
+  };
+
+  const openMap = (lat: number, lng: number) => {
+    window.open(`https://www.google.com/maps?q=${lat},${lng}`, "_blank");
+  };
+
   const getDeliveryStatusColor = (status: string) => {
     switch (status) {
       case "PENDING":
@@ -242,9 +366,47 @@ export default function OrdersPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">Orders</h1>
-        <p className="text-gray-600 mt-1">Manage and track all orders</p>
+      <div className="flex justify-between items-start">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Orders</h1>
+          <p className="text-gray-600 mt-1">
+            Manage and track all orders • Last count: {lastOrderCountRef.current}
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <button
+            onClick={() => {
+              console.log("🧪 Manual check triggered");
+              fetchOrdersQuietly();
+            }}
+            className="flex items-center gap-2 px-4 py-2 bg-green-100 text-green-700 hover:bg-green-200 rounded-lg transition-colors text-sm"
+            title="Manually check for new orders"
+          >
+            <Package className="w-4 h-4" />
+            <span className="hidden sm:inline">Check Now</span>
+          </button>
+          <button
+            onClick={() => setSoundEnabled(!soundEnabled)}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
+              soundEnabled
+                ? "bg-blue-100 text-blue-700 hover:bg-blue-200"
+                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+            }`}
+            title={soundEnabled ? "Disable notification sound" : "Enable notification sound"}
+          >
+            {soundEnabled ? (
+              <>
+                <Volume2 className="w-4 h-4" />
+                <span className="text-sm hidden sm:inline">Sound On</span>
+              </>
+            ) : (
+              <>
+                <VolumeX className="w-4 h-4" />
+                <span className="text-sm hidden sm:inline">Sound Off</span>
+              </>
+            )}
+          </button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -485,17 +647,71 @@ export default function OrdersPage() {
               {/* Customer Info */}
               <div>
                 <h3 className="font-semibold text-gray-900 mb-3">Customer Information</h3>
-                <div className="space-y-2 text-sm">
+                <div className="space-y-3 text-sm">
                   <div className="flex items-center gap-2">
                     <Phone className="w-4 h-4 text-gray-400" />
-                    <span>{selectedOrder.customerPhone}</span>
+                    <a
+                      href={`tel:${selectedOrder.customerPhone}`}
+                      className="text-blue-600 hover:underline"
+                    >
+                      {selectedOrder.customerPhone}
+                    </a>
                   </div>
+                  {selectedOrder.customerName && (
+                    <div className="text-gray-700">
+                      <span className="font-medium">Name:</span> {selectedOrder.customerName}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Delivery Address */}
+              <div>
+                <h3 className="font-semibold text-gray-900 mb-3">Delivery Address</h3>
+                <div className="bg-gray-50 rounded-lg p-4 space-y-3">
                   <div className="flex items-start gap-2">
-                    <MapPin className="w-4 h-4 text-gray-400 mt-1" />
-                    <span>
-                      {selectedOrder.customerName && `${selectedOrder.customerName}, `}
-                      {selectedOrder.city}, {selectedOrder.postalCode}
-                    </span>
+                    <MapPin className="w-5 h-5 text-gray-400 mt-0.5 flex-shrink-0" />
+                    <div className="flex-1 text-sm text-gray-700">
+                      <p>{selectedOrder.addressLine1}</p>
+                      {selectedOrder.addressLine2 && <p>{selectedOrder.addressLine2}</p>}
+                      <p>
+                        {selectedOrder.city}
+                        {selectedOrder.state && `, ${selectedOrder.state}`}
+                      </p>
+                      <p className="font-medium">Pincode: {selectedOrder.postalCode}</p>
+                    </div>
+                  </div>
+                  
+                  {/* Action Buttons */}
+                  <div className="flex flex-wrap gap-2 pt-2">
+                    <button
+                      onClick={() => {
+                        const fullAddress = [
+                          selectedOrder.addressLine1,
+                          selectedOrder.addressLine2,
+                          selectedOrder.city,
+                          selectedOrder.state,
+                          selectedOrder.postalCode,
+                        ]
+                          .filter(Boolean)
+                          .join(", ");
+                        copyToClipboard(fullAddress);
+                      }}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 text-sm text-gray-700 transition-colors"
+                    >
+                      <Copy className="w-4 h-4" />
+                      Copy Address
+                    </button>
+                    
+                    {selectedOrder.lat && selectedOrder.lng && (
+                      <button
+                        onClick={() => openMap(selectedOrder.lat!, selectedOrder.lng!)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm transition-colors"
+                      >
+                        <Map className="w-4 h-4" />
+                        View on Map
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>

@@ -99,6 +99,20 @@ export async function POST(req: Request) {
       include: { items: true },
     });
 
+    console.log("✅ Order created successfully:", order.id);
+
+    // Send email notification to admin (fire and forget - don't wait for response)
+    const notificationUrl = `${process.env.NEXTAUTH_URL || "http://localhost:4000"}/api/admin/notify-new-order`;
+    console.log("📧 Triggering email notification to:", notificationUrl);
+    
+    fetch(notificationUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ orderId: order.id }),
+    })
+      .then((res) => console.log("📧 Email notification response:", res.status))
+      .catch((err) => console.error("❌ Failed to send admin notification:", err));
+
     return NextResponse.json({ ok: true, order });
   } catch (e: unknown) {
     console.error(e);

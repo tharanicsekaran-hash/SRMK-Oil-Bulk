@@ -14,7 +14,7 @@ export async function GET() {
 
     const addresses = await prisma.address.findMany({
       where: { userId: session.user.id },
-      orderBy: { createdAt: "desc" },
+      orderBy: [{ isDefault: "desc" }, { createdAt: "desc" }],
     });
 
     return NextResponse.json({ addresses });
@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { label, line1, line2, city, state, postalCode, lat, lng } =
+    const { label, line1, line2, city, state, postalCode, lat, lng, isDefault } =
       await request.json();
 
     if (!line1 || !city || !postalCode) {
@@ -44,6 +44,14 @@ export async function POST(request: NextRequest) {
         { error: "Address line, city, and postal code are required" },
         { status: 400 }
       );
+    }
+
+    // If this is set as default, unset all other addresses
+    if (isDefault) {
+      await prisma.address.updateMany({
+        where: { userId: session.user.id },
+        data: { isDefault: false },
+      });
     }
 
     const address = await prisma.address.create({
@@ -57,6 +65,7 @@ export async function POST(request: NextRequest) {
         postalCode,
         lat,
         lng,
+        isDefault: isDefault || false,
       },
     });
 

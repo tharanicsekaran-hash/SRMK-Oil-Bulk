@@ -6,6 +6,21 @@ import { useI18n } from "@/components/LanguageProvider";
 import { useCart } from "@/store/cart";
 import { formatPricePaisa } from "@/lib/products";
 import { useRouter } from "next/navigation";
+import { MapPin, Plus } from "lucide-react";
+import AddressModal from "@/components/AddressModal";
+import OrderSuccessModal from "@/components/OrderSuccessModal";
+
+type SavedAddress = {
+  id: string;
+  line1: string;
+  line2: string | null;
+  city: string;
+  state: string;
+  postalCode: string;
+  lat: number | null;
+  lng: number | null;
+  isDefault: boolean;
+};
 
 export default function CheckoutPage() {
   const { locale } = useI18n();
@@ -13,45 +28,72 @@ export default function CheckoutPage() {
   const { items, clear } = useCart();
   const { data: session } = useSession();
   
+  // Contact info
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
+  
+  // Saved addresses
+  const [savedAddresses, setSavedAddresses] = useState<SavedAddress[]>([]);
+  const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
+  const [showAddressForm, setShowAddressForm] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  
+  // Manual address form
   const [addressLine, setAddressLine] = useState("");
   const [pincode, setPincode] = useState("");
   const [city, setCity] = useState("");
   const [isLoadingCity, setIsLoadingCity] = useState(false);
   const [location, setLocation] = useState<LatLng | undefined>();
+  const [saveAddress, setSaveAddress] = useState(false);
+  
+  // Payment and notes
   const [paymentMethod, setPaymentMethod] = useState<"COD">("COD");
   const [comments, setComments] = useState("");
-  const [saveAddress, setSaveAddress] = useState(false);
+  
+  // Success modal
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
 
   const subtotal = items.reduce((sum, i) => sum + i.pricePaisa * i.qty, 0);
   const deliveryChargePaisa = subtotal < 50000 ? 5000 : 0;
   const totalPaisa = subtotal + deliveryChargePaisa;
 
-  // Pre-fill user data from session
+  // Fetch user data and saved addresses
   useEffect(() => {
     if (session?.user) {
       if (session.user.name) setName(session.user.name);
       if (session.user.phone) setPhone(session.user.phone);
+      fetchSavedAddresses();
     }
   }, [session]);
+
+  const fetchSavedAddresses = async () => {
+    try {
+      const response = await fetch("/api/addresses");
+      if (response.ok) {
+        const data = await response.json();
+        setSavedAddresses(data.addresses || []);
+        
+        // Auto-select default address if available
+        const defaultAddr = data.addresses?.find((addr: SavedAddress) => addr.isDefault);
+        if (defaultAddr) {
+          setSelectedAddressId(defaultAddr.id);
+        }
+      }
+    } catch (error) {
+      console.error("Failed to fetch addresses:", error);
+    }
+  };
 
   const fetchCityFromPincode = async (pin: string) => {
     if (pin.length !== 6) return;
     
     setIsLoadingCity(true);
     try {
-      console.log("Fetching city for pincode:", pin);
       const response = await fetch(`/api/geocode?pincode=${pin}`);
       const data = await response.json();
-      console.log("Geocode API response:", data);
       
       if (response.ok && data.success && data.city) {
-        console.log("Found city:", data.city);
         setCity(data.city);
-      } else {
-        console.error("Failed to fetch city:", data.error);
-        // Allow user to manually enter city if auto-fill fails
       }
     } catch (error) {
       console.error("Error fetching city from pincode:", error);
@@ -71,15 +113,87 @@ export default function CheckoutPage() {
     }
   };
 
+  const handleSelectAddress = (addressId: string) => {
+    setSelectedAddressId(addressId);
+    setShowAddressForm(false);
+  };
+
+  const handleUseDifferentAddress = () => {
+    setSelectedAddressId(null);
+    setShowAddressForm(true);
+  };
+
+  const handleAddNewAddress = async (address: {
+    id?: string;
+    line1: string;
+    line2?: string | null;
+    city: string;
+    state?: string;
+    postalCode: string;
+    lat?: number | null;
+    lng?: number | null;
+    isDefault?: boolean;
+  }) => {
+    try {
+      const response = await fetch("/api/addresses", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(address),
+      });
+
+      if (response.ok) {
+        setIsModalOpen(false);
+        await fetchSavedAddresses();
+      }
+    } catch (error) {
+      console.error("Failed to save address:", error);
+    }
+  };
+
   const placeOrder = async () => {
-    if (!name || !phone || !addressLine || !pincode || !city) {
-      alert("Please fill all required fields / தயவுசெய்து அனைத்து தேவையான புலங்களையும் நிரப்பவும்");
+    let orderAddress;
+    
+    // Determine which address to use
+    if (selectedAddressId) {
+      const selectedAddr = savedAddresses.find(addr => addr.id === selectedAddressId);
+      if (!selectedAddr) {
+        alert(locale === "en" ? "Please select a delivery address" : "தயவுசெய்து விநியோக முகவரியைத் தேர்ந்தெடுக்கவும்");
+        return;
+      }
+      orderAddress = {
+        addressLine1: selectedAddr.line1,
+        addressLine2: selectedAddr.line2 || "",
+        city: selectedAddr.city,
+        state: selectedAddr.state,
+        postalCode: selectedAddr.postalCode,
+        lat: selectedAddr.lat,
+        lng: selectedAddr.lng,
+      };
+    } else {
+      // Using manual address
+      if (!addressLine || !pincode || !city) {
+        alert("Please fill all required fields / தயவுசெய்து அனைத்து தேவையான புலங்களையும் நிரப்பவும்");
+        return;
+      }
+      orderAddress = {
+        addressLine1: addressLine,
+        addressLine2: "",
+        city,
+        state: "",
+        postalCode: pincode,
+        lat: location?.lat,
+        lng: location?.lng,
+      };
+    }
+
+    if (!name || !phone) {
+      alert("Please fill name and phone / தயவுசெய்து பெயர் மற்றும் தொலைபேசியை நிரப்பவும்");
       return;
     }
 
     try {
-      // Save address if checkbox is checked and user is logged in
-      if (saveAddress && session?.user?.id) {
+      // Save address if checkbox is checked and user is logged in (only for manual entry)
+      if (saveAddress && !selectedAddressId && session?.user?.id) {
         await fetch("/api/addresses", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -108,25 +222,29 @@ export default function CheckoutPage() {
           })),
           customerName: name,
           customerPhone: phone,
-          addressLine1: addressLine,
-          addressLine2: "",
-          city,
-          state: "",
-          postalCode: pincode,
-          lat: location?.lat,
-          lng: location?.lng,
+          ...orderAddress,
           notes: comments,
           paymentMethod,
           deliveryChargePaisa,
         }),
       });
       if (!res.ok) throw new Error("Order failed / ஆர்டர் தோல்வியடைந்தது");
+      
+      // Clear cart and show success modal
       clear();
-      router.push("/account");
+      setShowSuccessModal(true);
+      
+      // Redirect to account page after 3 seconds
+      setTimeout(() => {
+        router.push("/account?tab=orders");
+      }, 3000);
     } catch {
       alert("Failed to place order. Please try again. / ஆர்டர் செய்ய தவறிவிட்டது. மீண்டும் முயற்சிக்கவும்.");
     }
   };
+
+  // Determine if we should show saved addresses section
+  const shouldShowSavedAddresses = session && savedAddresses.length > 0 && !showAddressForm;
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-6">
@@ -137,6 +255,7 @@ export default function CheckoutPage() {
 
       <div className="grid gap-6 md:grid-cols-5">
         <div className="md:col-span-3 space-y-4">
+          {/* Contact */}
           <div className="border rounded p-4 space-y-3">
             <div className="font-medium">Contact / தொடர்பு</div>
             <div className="grid gap-3">
@@ -148,69 +267,149 @@ export default function CheckoutPage() {
               />
               <input 
                 className="border rounded px-3 py-2" 
-                placeholder="Phone / தொலைபேசி" 
+                placeholder="Phone / தொலைபேசி" 
                 value={phone} 
                 onChange={(e) => setPhone(e.target.value)} 
               />
             </div>
           </div>
 
-          <div className="border rounded p-4 space-y-4">
-            <div className="font-medium">Delivery Address / விநியோக முகவரி</div>
-            <div className="grid gap-3">
-              <input 
-                className="border rounded px-3 py-2" 
-                placeholder="Address line / முகவரி வரி *" 
-                value={addressLine} 
-                onChange={(e) => setAddressLine(e.target.value)} 
-                required
-              />
-              <input 
-                className="border rounded px-3 py-2" 
-                placeholder="Pincode / பின் குறியீடு *" 
-                value={pincode} 
-                onChange={(e) => handlePincodeChange(e.target.value)} 
-                required
-                maxLength={6}
-                inputMode="numeric"
-              />
-              <input 
-                className={`border rounded px-3 py-2 ${isLoadingCity ? 'bg-gray-50' : ''}`}
-                placeholder="City / நகரம் *" 
-                value={city} 
-                onChange={(e) => setCity(e.target.value)}
-                required
-                disabled={isLoadingCity}
-              />
-              {isLoadingCity && (
-                <p className="text-xs text-gray-500">Loading city... / நகரம் ஏற்றப்படுகிறது...</p>
-              )}
+          {/* Saved Addresses Section */}
+          {shouldShowSavedAddresses ? (
+            <div className="border rounded p-4 space-y-4">
+              <div className="flex justify-between items-center">
+                <div className="font-medium">Select Delivery Address / விநியோக முகவரியைத் தேர்ந்தெடுக்கவும்</div>
+                <button
+                  onClick={() => setIsModalOpen(true)}
+                  className="flex items-center gap-1 text-sm text-orange-600 hover:text-orange-700"
+                >
+                  <Plus className="w-4 h-4" />
+                  {locale === "en" ? "Add New" : "புதியது சேர்"}
+                </button>
+              </div>
+              
+              <div className="space-y-3">
+                {savedAddresses.map((addr) => (
+                  <div
+                    key={addr.id}
+                    onClick={() => handleSelectAddress(addr.id)}
+                    className={`border rounded p-4 cursor-pointer transition ${
+                      selectedAddressId === addr.id
+                        ? "border-orange-500 bg-orange-50"
+                        : "hover:border-orange-300"
+                    }`}
+                  >
+                    <div className="flex items-start gap-3">
+                      <input
+                        type="radio"
+                        checked={selectedAddressId === addr.id}
+                        onChange={() => handleSelectAddress(addr.id)}
+                        className="mt-1"
+                      />
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <MapPin className="w-4 h-4 text-gray-400" />
+                          {addr.isDefault && (
+                            <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded">
+                              {locale === "en" ? "Default" : "இயல்புநிலை"}
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-sm text-gray-700">
+                          {addr.line1}
+                          {addr.line2 && `, ${addr.line2}`}
+                        </div>
+                        <div className="text-sm text-gray-600">
+                          {addr.city}, {addr.postalCode}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <button
+                onClick={handleUseDifferentAddress}
+                className="w-full py-2 text-sm text-orange-600 hover:text-orange-700 border border-orange-300 rounded hover:bg-orange-50 transition"
+              >
+                {locale === "en" ? "Use a different address" : "வேறு முகவரியைப் பயன்படுத்து"}
+              </button>
             </div>
-            {session && (
-              <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={saveAddress}
-                  onChange={(e) => setSaveAddress(e.target.checked)}
-                  className="rounded"
-                />
-                {locale === "en"
-                  ? "Save this address to my account"
-                  : "இந்த முகவரியை எனது கணக்கில் சேமிக்கவும்"}
-              </label>
-            )}
-          </div>
+          ) : (
+            /* Manual Address Form */
+            <>
+              <div className="border rounded p-4 space-y-4">
+                <div className="flex justify-between items-center">
+                  <div className="font-medium">Delivery Address / விநியோக முகவரி</div>
+                  {session && savedAddresses.length > 0 && showAddressForm && (
+                    <button
+                      onClick={() => {
+                        setShowAddressForm(false);
+                        setSelectedAddressId(savedAddresses.find(a => a.isDefault)?.id || savedAddresses[0]?.id || null);
+                      }}
+                      className="text-sm text-orange-600 hover:text-orange-700"
+                    >
+                      {locale === "en" ? "Choose saved address" : "சேமித்த முகவரியைத் தேர்ந்தெடுக்கவும்"}
+                    </button>
+                  )}
+                </div>
+                <div className="grid gap-3">
+                  <input 
+                    className="border rounded px-3 py-2" 
+                    placeholder="Address line / முகவரி வரி *" 
+                    value={addressLine} 
+                    onChange={(e) => setAddressLine(e.target.value)} 
+                    required
+                  />
+                  <input 
+                    className="border rounded px-3 py-2" 
+                    placeholder="Pincode / பின் குறியீடு *" 
+                    value={pincode} 
+                    onChange={(e) => handlePincodeChange(e.target.value)} 
+                    required
+                    maxLength={6}
+                    inputMode="numeric"
+                  />
+                  <input 
+                    className={`border rounded px-3 py-2 ${isLoadingCity ? 'bg-gray-50' : ''}`}
+                    placeholder="City / நகரம் *" 
+                    value={city} 
+                    onChange={(e) => setCity(e.target.value)}
+                    required
+                    disabled={isLoadingCity}
+                  />
+                  {isLoadingCity && (
+                    <p className="text-xs text-gray-500">Loading city... / நகரம் ஏற்றப்படுகிறது...</p>
+                  )}
+                </div>
+                {session && (
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={saveAddress}
+                      onChange={(e) => setSaveAddress(e.target.checked)}
+                      className="rounded"
+                    />
+                    {locale === "en"
+                      ? "Save this address to my account"
+                      : "இந்த முகவரியை எனது கணக்கில் சேமிக்கவும்"}
+                  </label>
+                )}
+              </div>
 
-          <div className="border rounded p-4 space-y-4">
-            <div className="font-medium">Delivery Location (Optional) / விநியோக இடம் (விருப்பமானது)</div>
-            {location && (
-              <p className="text-xs text-green-600">
-                ✓ Location set: {location.lat.toFixed(6)}, {location.lng.toFixed(6)}
-              </p>
-            )}
-            <MapPicker value={location} onChange={setLocation} />
-          </div>
+              <div className="border rounded p-4 space-y-4">
+                <div className="font-medium">Delivery Location (Optional) / விநியோக இடம் (விருப்பமானது)</div>
+                {location && (
+                  <p className="text-xs text-green-600">
+                    ✓ Location set: {location.lat.toFixed(6)}, {location.lng.toFixed(6)}
+                  </p>
+                )}
+                <MapPicker value={location} onChange={setLocation} />
+              </div>
+            </>
+          )}
 
+          {/* Payment Method */}
           <div className="border rounded p-4 space-y-3">
             <div className="font-medium">Payment Method / கட்டண முறை</div>
             <label className="flex items-center gap-2 text-sm">
@@ -224,6 +423,7 @@ export default function CheckoutPage() {
             </label>
           </div>
 
+          {/* Additional Notes */}
           <div className="border rounded p-4 space-y-2">
             <div className="font-medium">Additional Notes / கூடுதல் குறிப்புகள்</div>
             <textarea
@@ -235,6 +435,7 @@ export default function CheckoutPage() {
           </div>
         </div>
 
+        {/* Order Summary */}
         <div className="md:col-span-2 space-y-4">
           <div className="border rounded p-4 space-y-3">
             <div className="font-semibold">Order Summary / ஆர்டர் சுருக்கம்</div>
@@ -272,6 +473,21 @@ export default function CheckoutPage() {
           </div>
         </div>
       </div>
+
+      {/* Address Modal */}
+      <AddressModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onSave={handleAddNewAddress}
+        address={null}
+        title={locale === "en" ? "Add New Address" : "புதிய முகவரியைச் சேர்க்கவும்"}
+      />
+
+      {/* Order Success Modal */}
+      <OrderSuccessModal
+        isOpen={showSuccessModal}
+        onClose={() => setShowSuccessModal(false)}
+      />
     </div>
   );
 }
