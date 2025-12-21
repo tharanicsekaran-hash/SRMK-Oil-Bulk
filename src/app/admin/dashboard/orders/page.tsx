@@ -16,7 +16,9 @@ import {
   Map,
   Volume2,
   VolumeX,
+  Plus,
 } from "lucide-react";
+import CreateOrderModal from "@/components/CreateOrderModal";
 
 type Order = {
   id: string;
@@ -64,6 +66,7 @@ export default function OrdersPage() {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
+  const [isCreateOrderModalOpen, setIsCreateOrderModalOpen] = useState(false);
   const [selectedDeliveryUser, setSelectedDeliveryUser] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   
@@ -405,6 +408,14 @@ export default function OrdersPage() {
           </p>
         </div>
         <div className="flex gap-2">
+          <button
+            onClick={() => setIsCreateOrderModalOpen(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 rounded-lg transition-colors text-sm font-medium shadow-sm"
+            title="Create a new order manually"
+          >
+            <Plus className="w-4 h-4" />
+            <span className="hidden sm:inline">Create Order</span>
+          </button>
           <button
             onClick={() => {
               console.log("🧪 Manual check triggered");
@@ -849,6 +860,16 @@ export default function OrdersPage() {
           </div>
         </div>
       )}
+
+      {/* Create Order Modal */}
+      <CreateOrderModal
+        isOpen={isCreateOrderModalOpen}
+        onClose={() => setIsCreateOrderModalOpen(false)}
+        onSuccess={() => {
+          fetchOrders(); // Refresh orders list
+          setIsCreateOrderModalOpen(false);
+        }}
+      />
     </div>
   );
 }

@@ -235,8 +235,8 @@ export default function AdminDashboardLayout({ children }: AdminLayoutProps) {
                 <Shield className="w-6 h-6 text-white" />
               </div>
               <div>
-                <h2 className="font-bold text-gray-900">Admin Panel</h2>
-                <p className="text-xs text-gray-600 capitalize">{userRole?.toLowerCase()}</p>
+                <h2 className="font-bold text-gray-900">SRMK Oil Mill</h2>
+                <p className="text-xs text-gray-600 capitalize">{userRole?.toLowerCase()} Access</p>
               </div>
             </div>
             <button
@@ -334,6 +334,7 @@ export default function AdminDashboardLayout({ children }: AdminLayoutProps) {
         {/* Top Bar */}
         <header className="bg-white border-b border-gray-200 px-4 lg:px-8 py-4">
           <div className="flex items-center justify-between">
+            {/* Mobile Menu Button */}
             <button
               onClick={() => setSidebarOpen(true)}
               className="lg:hidden text-gray-600 hover:text-gray-900"
@@ -341,10 +342,22 @@ export default function AdminDashboardLayout({ children }: AdminLayoutProps) {
               <Menu className="w-6 h-6" />
             </button>
 
-            <div className="flex-1 lg:flex-none">
-              <h1 className="text-xl font-bold text-gray-900 lg:hidden">
+            {/* Admin Panel Badge - Top Left (Desktop only) */}
+            <div className="hidden lg:flex items-center gap-2 px-3 py-1.5 bg-blue-50 rounded-lg border border-blue-200">
+              <Shield className="w-4 h-4 text-blue-600" />
+              <span className="text-xs font-semibold text-blue-700">Admin Panel</span>
+            </div>
+
+            {/* Centered Logo/Company Name */}
+            <div className="flex-1 flex justify-center">
+              <h1 className="text-xl font-bold text-[#d97706]">SRMK Oil Mill</h1>
+            </div>
+
+            {/* Mobile: Current Page Title */}
+            <div className="lg:hidden flex-1 text-center">
+              <h2 className="text-sm font-medium text-gray-700">
                 {visibleItems.find((item) => item.href === pathname)?.label || "Dashboard"}
-              </h1>
+              </h2>
             </div>
 
             {/* Desktop User Info */}
@@ -352,6 +365,15 @@ export default function AdminDashboardLayout({ children }: AdminLayoutProps) {
               <div className="text-right">
                 <p className="text-sm font-medium text-gray-900">{session?.user?.name}</p>
                 <p className="text-xs text-gray-600 capitalize">{userRole?.toLowerCase()} Access</p>
+              </div>
+            </div>
+
+            {/* Mobile: User Info Icon */}
+            <div className="lg:hidden">
+              <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                <span className="text-blue-600 font-semibold text-xs">
+                  {session?.user?.name?.charAt(0)?.toUpperCase() || "A"}
+                </span>
               </div>
             </div>
           </div>
