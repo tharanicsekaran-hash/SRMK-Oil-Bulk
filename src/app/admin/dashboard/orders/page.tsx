@@ -59,6 +59,7 @@ export default function OrdersPage() {
   const [deliveryStatusFilter, setDeliveryStatusFilter] = useState("all");
   const [assignedToFilter, setAssignedToFilter] = useState("all");
   const [pincodeFilter, setPincodeFilter] = useState("");
+  const [dateFilter, setDateFilter] = useState("all"); // all, today, yesterday, last7days, last30days
   
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
@@ -104,7 +105,7 @@ export default function OrdersPage() {
   useEffect(() => {
     filterOrders();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchQuery, statusFilter, deliveryStatusFilter, assignedToFilter, pincodeFilter, orders]);
+  }, [searchQuery, statusFilter, deliveryStatusFilter, assignedToFilter, pincodeFilter, dateFilter, orders]);
 
   const fetchOrders = async () => {
     try {
@@ -244,6 +245,35 @@ export default function OrdersPage() {
     // Pincode filter
     if (pincodeFilter) {
       filtered = filtered.filter((o) => o.postalCode?.includes(pincodeFilter));
+    }
+
+    // Date filter
+    if (dateFilter !== "all") {
+      const now = new Date();
+      const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const yesterdayStart = new Date(todayStart);
+      yesterdayStart.setDate(yesterdayStart.getDate() - 1);
+      const last7DaysStart = new Date(todayStart);
+      last7DaysStart.setDate(last7DaysStart.getDate() - 7);
+      const last30DaysStart = new Date(todayStart);
+      last30DaysStart.setDate(last30DaysStart.getDate() - 30);
+
+      filtered = filtered.filter((o) => {
+        const orderDate = new Date(o.createdAt);
+        
+        switch (dateFilter) {
+          case "today":
+            return orderDate >= todayStart;
+          case "yesterday":
+            return orderDate >= yesterdayStart && orderDate < todayStart;
+          case "last7days":
+            return orderDate >= last7DaysStart;
+          case "last30days":
+            return orderDate >= last30DaysStart;
+          default:
+            return true;
+        }
+      });
     }
 
     setFilteredOrders(filtered);
@@ -434,7 +464,19 @@ export default function OrdersPage() {
             />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <select
+              value={dateFilter}
+              onChange={(e) => setDateFilter(e.target.value)}
+              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              <option value="all">All Dates</option>
+              <option value="today">Today</option>
+              <option value="yesterday">Yesterday</option>
+              <option value="last7days">Last 7 Days</option>
+              <option value="last30days">Last 30 Days</option>
+            </select>
+
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}

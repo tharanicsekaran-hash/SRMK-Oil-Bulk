@@ -94,15 +94,15 @@ export default function ProductCard({ variants }: { variants: Product[] }) {
             <div className="text-xl font-semibold text-[#d97706]">
               {formatPricePaisa(p.pricePaisa, locale)}
             </div>
-            {p.discount && p.discount > 0 && (
+            {p.discount != null && p.discount > 0 && (
               <span className="text-xs text-green-600 font-medium">
                 {p.discount}% OFF
               </span>
             )}
           </div>
-          {p.offerTextEn && (
+          {(p.offerTextEn || p.offerTextTa) && (
             <p className="text-xs text-green-600 mt-1">
-              {locale === "ta" ? p.offerTextTa : p.offerTextEn}
+              {locale === "ta" ? (p.offerTextTa || p.offerTextEn) : (p.offerTextEn || p.offerTextTa)}
             </p>
           )}
           <div className="mt-2 flex items-center gap-2">
