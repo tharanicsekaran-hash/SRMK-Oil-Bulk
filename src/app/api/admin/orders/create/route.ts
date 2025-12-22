@@ -3,6 +3,14 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
+type OrderItemInput = {
+  productId: string;
+  productName: string;
+  unit: string;
+  pricePaisa: number;
+  qty: number;
+};
+
 // POST - Create order (Admin only)
 export async function POST(request: NextRequest) {
   try {
@@ -45,7 +53,7 @@ export async function POST(request: NextRequest) {
 
     // Calculate total
     const totalPaisa = items.reduce(
-      (sum: number, item: any) => sum + item.pricePaisa * item.qty,
+      (sum: number, item: OrderItemInput) => sum + item.pricePaisa * item.qty,
       0
     ) + (deliveryChargePaisa || 0);
 
@@ -68,7 +76,7 @@ export async function POST(request: NextRequest) {
         status: "PENDING",
         deliveryStatus: deliveryStatus || "PENDING",
         items: {
-          create: items.map((item: any) => ({
+          create: items.map((item: OrderItemInput) => ({
             productId: item.productId,
             productSlug: "", // Optional, can be fetched if needed
             productName: item.productName,

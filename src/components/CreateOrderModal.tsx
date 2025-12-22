@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { X, Search, Plus, Minus, Trash2, MapPin, Loader2 } from "lucide-react";
+import { X, Search, Plus, Minus, Trash2, Loader2 } from "lucide-react";
 import MapPicker, { type LatLng } from "@/components/MapPicker";
 
 type Product = {
@@ -440,7 +440,7 @@ export default function CreateOrderModal({
                     <label className="text-xs font-medium text-gray-700 mb-1 block">Delivery Status</label>
                     <select
                       value={deliveryStatus}
-                      onChange={(e) => setDeliveryStatus(e.target.value as any)}
+                      onChange={(e) => setDeliveryStatus(e.target.value as "PENDING" | "ASSIGNED" | "PICKED_UP" | "IN_TRANSIT" | "DELIVERED")}
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     >
                       <option value="PENDING">Pending</option>

@@ -8,8 +8,8 @@ export default function ConditionalLayout({ children }: { children: React.ReactN
   const pathname = usePathname();
   
   // Check if we're on an admin or auth page
-  const isAdminPage = pathname.startsWith("/admin");
-  const isAuthPage = pathname.startsWith("/auth");
+  const isAdminPage = pathname?.startsWith("/admin") ?? false;
+  const isAuthPage = pathname?.startsWith("/auth") ?? false;
   
   // Don't show header/footer on admin or auth pages
   if (isAdminPage || isAuthPage) {
