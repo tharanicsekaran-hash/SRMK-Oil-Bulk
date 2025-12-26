@@ -114,7 +114,6 @@ export default function AdminDashboardLayout({ children }: AdminLayoutProps) {
       // First time - initialize with current count
       fetchAndInitialize();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchAndInitialize = async () => {

@@ -4,7 +4,7 @@ import { formatPricePaisa } from "@/lib/products";
 import { useI18n } from "@/components/LanguageProvider";
 import { useCart } from "@/store/cart";
 import Image from "next/image";
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState } from "react";
 import { Loader2, ShoppingCart, Zap } from "lucide-react";
 import { useToast } from "@/store/toast";
 import Link from "next/link";
@@ -166,7 +166,7 @@ export default function ProductDetailPage() {
       <div className="max-w-5xl mx-auto px-4 py-12">
         <div className="text-center">
           <h1 className="text-2xl font-bold mb-4">Product Not Found</h1>
-          <p className="text-gray-600 mb-6">The product you're looking for doesn't exist or has been removed.</p>
+          <p className="text-gray-600 mb-6">The product you&apos;re looking for doesn&apos;t exist or has been removed.</p>
           <Link href="/products" className="px-5 py-2.5 rounded-md bg-[#d97706] text-white hover:bg-[#b76405] font-semibold">
             Browse All Products
           </Link>
