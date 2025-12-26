@@ -55,8 +55,10 @@ model Product {
   nameTa        String
   nameEn        String
   slug          String   @unique
-  descriptionTa String?
-  descriptionEn String?
+  taglineTa     String?  // short catchy description in Tamil (shown in product card and detail page)
+  taglineEn     String?  // short catchy description in English (shown in product card and detail page)
+  descriptionTa String?  // full detailed description in Tamil
+  descriptionEn String?  // full detailed description in English
   imageUrl      String?
   pricePaisa    Int      // price in paise
   unit          String   // e.g., "500ml", "1L"

@@ -87,39 +87,65 @@ SRMK Oil Mill - Admin Notification
     if (process.env.RESEND_API_KEY) {
       try {
         console.log("📧 Attempting to send email via Resend...");
+        console.log("📧 RESEND_API_KEY exists:", !!process.env.RESEND_API_KEY);
+        console.log("📧 NEXTAUTH_URL:", process.env.NEXTAUTH_URL);
         
         // Initialize Resend with API key (only when needed)
         const resend = new Resend(process.env.RESEND_API_KEY);
         
+        // Use verified domain if available, otherwise use Resend test domain
+        // In production, if domain is not verified, use test domain
+        const fromEmail = process.env.NODE_ENV === "production" 
+          ? (process.env.RESEND_VERIFIED_DOMAIN === "true" 
+              ? "SRMK Oil Mill <orders@srmkoilmill.in>"
+              : "onboarding@resend.dev") // Fallback to test domain
+          : "SRMK Oil Mill <orders@srmkoilmill.in>"; // Localhost can use any domain
+        
+        console.log("📧 From email:", fromEmail);
+        
         const { data, error } = await resend.emails.send({
-          from: "SRMK Oil Mill <orders@srmkoilmill.in>",
+          from: fromEmail,
           to: [emailContent.to],
           subject: emailContent.subject,
           text: emailContent.body,
         });
 
         if (error) {
-          console.error("❌ Resend error:", error);
+          console.error("❌ Resend error:", JSON.stringify(error, null, 2));
+          console.error("❌ Error type:", error.constructor?.name);
+          console.error("❌ Error message:", error.message);
+          console.error("❌ Full error:", error);
+          
           return NextResponse.json({ 
             success: false, 
-            error: error.message,
+            error: error.message || "Unknown Resend error",
+            errorDetails: process.env.NODE_ENV === "development" ? error : undefined,
             emailPreview: emailContent,
           }, { status: 500 });
         }
 
         console.log("✅ Email sent successfully via Resend!");
         console.log("📧 Email ID:", data?.id);
+        console.log("📧 From:", fromEmail);
         
         return NextResponse.json({ 
           success: true, 
           message: "Email sent successfully",
           emailId: data?.id,
+          from: fromEmail,
         });
       } catch (error) {
         console.error("❌ Failed to send email:", error);
+        console.error("❌ Error details:", {
+          message: error instanceof Error ? error.message : "Unknown error",
+          stack: error instanceof Error ? error.stack : undefined,
+          name: error instanceof Error ? error.name : undefined,
+        });
+        
         return NextResponse.json({ 
           success: false, 
-          error: "Failed to send email",
+          error: error instanceof Error ? error.message : "Failed to send email",
+          errorDetails: process.env.NODE_ENV === "development" ? String(error) : undefined,
           emailPreview: emailContent,
         }, { status: 500 });
       }
@@ -127,12 +153,15 @@ SRMK Oil Mill - Admin Notification
       // API key not configured - just log
       console.log("⚠️  RESEND_API_KEY not configured - email not sent");
       console.log("📝 Email content logged for debugging");
+      console.log("📝 NODE_ENV:", process.env.NODE_ENV);
+      console.log("📝 Available env vars:", Object.keys(process.env).filter(k => k.includes("RESEND") || k.includes("NEXTAUTH")));
       
       return NextResponse.json({ 
-        success: true, 
-        message: "Email notification logged (RESEND_API_KEY not configured)",
+        success: false,
+        message: "Email notification failed (RESEND_API_KEY not configured)",
         emailPreview: emailContent,
-      });
+        environment: process.env.NODE_ENV,
+      }, { status: 500 });
     }
   } catch (error) {
     console.error("❌ Email notification error:", error);

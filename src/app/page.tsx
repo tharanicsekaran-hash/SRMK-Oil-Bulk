@@ -14,6 +14,8 @@ type Product = {
   slug: string;
   nameTa: string;
   nameEn: string;
+  taglineTa?: string;
+  taglineEn?: string;
   descriptionTa?: string;
   descriptionEn?: string;
   imageUrl?: string;

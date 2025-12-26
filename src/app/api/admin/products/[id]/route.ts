@@ -47,6 +47,8 @@ export async function PUT(
         nameTa: data.nameTa,
         nameEn: data.nameEn,
         slug: data.slug,
+        taglineTa: data.taglineTa || null,
+        taglineEn: data.taglineEn || null,
         descriptionTa: data.descriptionTa || null,
         descriptionEn: data.descriptionEn || null,
         imageUrl: data.imageUrl || null,

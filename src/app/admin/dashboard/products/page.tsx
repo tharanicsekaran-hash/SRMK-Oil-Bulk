@@ -17,6 +17,8 @@ type Product = {
   nameTa: string;
   nameEn: string;
   slug: string;
+  taglineTa?: string;
+  taglineEn?: string;
   descriptionTa?: string;
   descriptionEn?: string;
   imageUrl?: string;
@@ -50,6 +52,8 @@ export default function ProductsPage() {
     nameTa: "",
     nameEn: "",
     slug: "",
+    taglineTa: "",
+    taglineEn: "",
     descriptionTa: "",
     descriptionEn: "",
     imageUrl: "",
@@ -121,6 +125,8 @@ export default function ProductsPage() {
       nameTa: "",
       nameEn: "",
       slug: "",
+      taglineTa: "",
+      taglineEn: "",
       descriptionTa: "",
       descriptionEn: "",
       imageUrl: "",
@@ -144,6 +150,8 @@ export default function ProductsPage() {
       nameTa: product.nameTa,
       nameEn: product.nameEn,
       slug: product.slug,
+      taglineTa: product.taglineTa || "",
+      taglineEn: product.taglineEn || "",
       descriptionTa: product.descriptionTa || "",
       descriptionEn: product.descriptionEn || "",
       imageUrl: product.imageUrl || "",
@@ -517,11 +525,42 @@ export default function ProductsPage() {
                 </div>
               </div>
 
+              {/* Taglines - Short catchy descriptions (shown in product card and detail page) */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Tagline (English) <span className="text-xs text-gray-500">- Short catchy description</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.taglineEn}
+                    onChange={(e) => setFormData({ ...formData, taglineEn: e.target.value })}
+                    placeholder="e.g., Traditional, flavorful cold-pressed groundnut oil"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Shown in product card and at top of detail page</p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Tagline (Tamil) <span className="text-xs text-gray-500">- Short catchy description</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.taglineTa}
+                    onChange={(e) => setFormData({ ...formData, taglineTa: e.target.value })}
+                    placeholder="e.g., மரபுத் தயாரிப்பு, சுவை நிறைந்தது"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Shown in product card and at top of detail page</p>
+                </div>
+              </div>
+
               {/* Descriptions */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Description (English)
+                    Description (English) <span className="text-xs text-gray-500">- Full detailed description</span>
                   </label>
                   <textarea
                     value={formData.descriptionEn}
@@ -533,7 +572,7 @@ export default function ProductsPage() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Description (Tamil)
+                    Description (Tamil) <span className="text-xs text-gray-500">- Full detailed description</span>
                   </label>
                   <textarea
                     value={formData.descriptionTa}
@@ -542,6 +581,7 @@ export default function ProductsPage() {
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
                 </div>
+              </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">

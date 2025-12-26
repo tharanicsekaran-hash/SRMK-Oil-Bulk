@@ -12,6 +12,8 @@ type Product = {
   slug: string;
   nameTa: string;
   nameEn: string;
+  taglineTa?: string;
+  taglineEn?: string;
   descriptionTa?: string;
   descriptionEn?: string;
   imageUrl?: string;
@@ -55,10 +57,16 @@ export default function ProductCard({ variants }: { variants: Product[] }) {
       <div className="px-4 pb-4 flex flex-col gap-2.5 flex-1">
         <div>
           <h3 className="text-base md:text-lg font-semibold leading-snug">{name}</h3>
-          {p.descriptionEn && (
-            <p className="text-[13px] md:text-sm text-gray-600 mt-1 leading-relaxed">{locale === "ta" ? p.descriptionTa : p.descriptionEn}</p>
-          )}
         </div>
+
+        {/* Tagline - between product name and size */}
+        {(p.taglineTa || p.taglineEn) && (
+          <div className="pb-1">
+            <p className="text-[13px] md:text-sm text-[#d97706] leading-relaxed font-medium italic">
+              {locale === "ta" ? (p.taglineTa || p.taglineEn) : (p.taglineEn || p.taglineTa)}
+            </p>
+          </div>
+        )}
 
         <div className="space-y-1">
           <div className="text-xs text-gray-600">{t.product.size}:</div>
