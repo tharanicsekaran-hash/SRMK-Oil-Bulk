@@ -45,6 +45,7 @@ export async function POST(req: Request) {
       lng,
       notes,
       paymentMethod = "COD",
+      deliveryChargePaisa = 0,
     } = body as {
       items: { productId?: string; productSlug?: string; productName: string; unit: string; pricePaisa: number; qty: number }[];
       customerName?: string;
@@ -58,13 +59,15 @@ export async function POST(req: Request) {
       lng?: number;
       notes?: string;
       paymentMethod?: "COD" | "RAZORPAY";
+      deliveryChargePaisa?: number;
     };
 
     if (!items?.length) {
       return NextResponse.json({ error: "No items" }, { status: 400 });
     }
 
-    const totalPaisa = items.reduce((s, i) => s + i.pricePaisa * i.qty, 0);
+    const subtotalPaisa = items.reduce((s, i) => s + i.pricePaisa * i.qty, 0);
+    const totalPaisa = subtotalPaisa + (deliveryChargePaisa || 0);
 
     // Get session to link order to user if logged in
     const session = await getServerSession(authOptions);

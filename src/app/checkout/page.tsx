@@ -47,8 +47,9 @@ export default function CheckoutPage() {
   const [saveAddress, setSaveAddress] = useState(false);
   
   // Payment and notes
-  const [paymentMethod, setPaymentMethod] = useState<"COD">("COD");
+  const [paymentMethod, setPaymentMethod] = useState<"COD" | "RAZORPAY">("COD");
   const [comments, setComments] = useState("");
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   
   // Success modal
   const [showSuccessModal, setShowSuccessModal] = useState(false);
@@ -150,6 +151,24 @@ export default function CheckoutPage() {
     }
   };
 
+  // Load Razorpay script
+  useEffect(() => {
+    if (paymentMethod === "RAZORPAY") {
+      const script = document.createElement("script");
+      script.src = "https://checkout.razorpay.com/v1/checkout.js";
+      script.async = true;
+      document.body.appendChild(script);
+
+      return () => {
+        // Cleanup: remove script if component unmounts
+        const existingScript = document.querySelector('script[src="https://checkout.razorpay.com/v1/checkout.js"]');
+        if (existingScript) {
+          document.body.removeChild(existingScript);
+        }
+      };
+    }
+  }, [paymentMethod]);
+
   const placeOrder = async () => {
     let orderAddress;
     
@@ -191,6 +210,8 @@ export default function CheckoutPage() {
       return;
     }
 
+    setIsProcessingPayment(true);
+
     try {
       // Save address if checkbox is checked and user is logged in (only for manual entry)
       if (saveAddress && !selectedAddressId && session?.user?.id) {
@@ -208,7 +229,8 @@ export default function CheckoutPage() {
         });
       }
 
-      const res = await fetch("/api/orders", {
+      // Create order in database first
+      const orderRes = await fetch("/api/orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -228,18 +250,134 @@ export default function CheckoutPage() {
           deliveryChargePaisa,
         }),
       });
-      if (!res.ok) throw new Error("Order failed / ஆர்டர் தோல்வியடைந்தது");
-      
-      // Clear cart and show success modal
-      clear();
-      setShowSuccessModal(true);
-      
-      // Redirect to account page after 3 seconds
-      setTimeout(() => {
-        router.push("/account?tab=orders");
-      }, 3000);
-    } catch {
-      alert("Failed to place order. Please try again. / ஆர்டர் செய்ய தவறிவிட்டது. மீண்டும் முயற்சிக்கவும்.");
+
+      if (!orderRes.ok) {
+        throw new Error("Order creation failed / ஆர்டர் உருவாக்கம் தோல்வியடைந்தது");
+      }
+
+      const orderData = await orderRes.json();
+      const dbOrderId = orderData.order.id;
+
+      // Handle payment based on method
+      if (paymentMethod === "RAZORPAY") {
+        // Create Razorpay order
+        const razorpayRes = await fetch("/api/payments/razorpay/create", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            amountPaisa: totalPaisa,
+            orderId: dbOrderId,
+            customerName: name,
+            customerPhone: phone,
+            customerEmail: session?.user?.email || undefined,
+          }),
+        });
+
+        if (!razorpayRes.ok) {
+          throw new Error("Razorpay order creation failed / ரசார்பே ஆர்டர் உருவாக்கம் தோல்வியடைந்தது");
+        }
+
+        const razorpayData = await razorpayRes.json();
+
+        // Open Razorpay checkout
+        const options = {
+          key: razorpayData.key,
+          amount: razorpayData.amount,
+          currency: razorpayData.currency,
+          name: "SRMK Oil Mill",
+          description: `Order #${dbOrderId}`,
+          order_id: razorpayData.razorpayOrderId,
+          handler: async function (response: {
+            razorpay_payment_id: string;
+            razorpay_order_id: string;
+            razorpay_signature: string;
+          }) {
+            try {
+              // Verify payment
+              const verifyRes = await fetch("/api/payments/razorpay/verify", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  razorpayOrderId: response.razorpay_order_id,
+                  razorpayPaymentId: response.razorpay_payment_id,
+                  razorpaySignature: response.razorpay_signature,
+                  orderId: dbOrderId,
+                }),
+              });
+
+              if (verifyRes.ok) {
+                // Payment successful
+                clear();
+                setShowSuccessModal(true);
+                setTimeout(() => {
+                  router.push("/account?tab=orders");
+                }, 3000);
+              } else {
+                const errorData = await verifyRes.json();
+                alert(
+                  locale === "en"
+                    ? `Payment verification failed: ${errorData.error || "Unknown error"}`
+                    : `கட்டண சரிபார்ப்பு தோல்வியடைந்தது: ${errorData.error || "தெரியாத பிழை"}`
+                );
+                setIsProcessingPayment(false);
+              }
+            } catch (error) {
+              console.error("Payment verification error:", error);
+              alert(
+                locale === "en"
+                  ? "Payment verification failed. Please contact support."
+                  : "கட்டண சரிபார்ப்பு தோல்வியடைந்தது. தயவுசெய்து ஆதரவைத் தொடர்பு கொள்ளவும்."
+              );
+              setIsProcessingPayment(false);
+            }
+          },
+          prefill: {
+            name: name,
+            contact: phone,
+            email: session?.user?.email || "",
+          },
+          theme: {
+            color: "#d97706",
+          },
+          modal: {
+            ondismiss: function () {
+              setIsProcessingPayment(false);
+            },
+          },
+        };
+
+        // Check if Razorpay is loaded
+        if (typeof window !== "undefined" && (window as any).Razorpay) {
+          const razorpayInstance = new (window as any).Razorpay(options);
+          razorpayInstance.on("payment.failed", function (response: any) {
+            alert(
+              locale === "en"
+                ? `Payment failed: ${response.error.description || "Unknown error"}`
+                : `கட்டணம் தோல்வியடைந்தது: ${response.error.description || "தெரியாத பிழை"}`
+            );
+            setIsProcessingPayment(false);
+          });
+          razorpayInstance.open();
+        } else {
+          throw new Error("Razorpay SDK not loaded / ரசார்பே SDK ஏற்றப்படவில்லை");
+        }
+      } else {
+        // COD - no payment processing needed
+        clear();
+        setShowSuccessModal(true);
+        setTimeout(() => {
+          router.push("/account?tab=orders");
+        }, 3000);
+        setIsProcessingPayment(false);
+      }
+    } catch (error) {
+      console.error("Order placement error:", error);
+      alert(
+        locale === "en"
+          ? `Failed to place order: ${error instanceof Error ? error.message : "Unknown error"}`
+          : `ஆர்டர் செய்ய தவறிவிட்டது: ${error instanceof Error ? error.message : "தெரியாத பிழை"}`
+      );
+      setIsProcessingPayment(false);
     }
   };
 
@@ -412,15 +550,26 @@ export default function CheckoutPage() {
           {/* Payment Method */}
           <div className="border rounded p-4 space-y-3">
             <div className="font-medium">Payment Method / கட்டண முறை</div>
-            <label className="flex items-center gap-2 text-sm">
-              <input 
-                type="radio" 
-                name="pm" 
-                checked={paymentMethod === "COD"} 
-                onChange={() => setPaymentMethod("COD")} 
-              />
-              Cash on Delivery / டெலிவரியின் போது பணம்
-            </label>
+            <div className="space-y-2">
+              <label className="flex items-center gap-2 text-sm cursor-pointer">
+                <input 
+                  type="radio" 
+                  name="pm" 
+                  checked={paymentMethod === "COD"} 
+                  onChange={() => setPaymentMethod("COD")} 
+                />
+                Cash on Delivery / டெலிவரியின் போது பணம்
+              </label>
+              <label className="flex items-center gap-2 text-sm cursor-pointer">
+                <input 
+                  type="radio" 
+                  name="pm" 
+                  checked={paymentMethod === "RAZORPAY"} 
+                  onChange={() => setPaymentMethod("RAZORPAY")} 
+                />
+                Online Payment (Razorpay) / ஆன்லைன் கட்டணம் (ரசார்பே)
+              </label>
+            </div>
           </div>
 
           {/* Additional Notes */}
@@ -462,10 +611,15 @@ export default function CheckoutPage() {
               <div className="font-semibold">{formatPricePaisa(totalPaisa, locale)}</div>
             </div>
             <button 
-              className="w-full mt-4 px-4 py-3 rounded bg-[#d97706] text-white hover:bg-[#b76405] font-medium" 
+              className="w-full mt-4 px-4 py-3 rounded bg-[#d97706] text-white hover:bg-[#b76405] font-medium disabled:opacity-50 disabled:cursor-not-allowed" 
               onClick={placeOrder}
+              disabled={isProcessingPayment}
             >
-              Place Order / ஆர்டர் செய்க
+              {isProcessingPayment
+                ? (locale === "en" ? "Processing..." : "செயல்படுத்துகிறது...")
+                : paymentMethod === "RAZORPAY"
+                ? (locale === "en" ? "Pay Now / ஆர்டர் செய்க" : "இப்போது பணம் செலுத்துங்கள் / ஆர்டர் செய்க")
+                : (locale === "en" ? "Place Order" : "ஆர்டர் செய்க")}
             </button>
             <div className="text-xs text-gray-500 text-center mt-2">
               Cash on Delivery available in serviceable areas. / சேவை செய்யக்கூடிய பகுதிகளில் டெலிவரியின் போது பணம் செலுத்தும் வசதி உள்ளது
