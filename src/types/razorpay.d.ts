@@ -32,9 +32,20 @@ export interface RazorpayPaymentResponse {
   razorpay_signature: string;
 }
 
+export interface RazorpayPaymentFailedResponse {
+  error: {
+    code?: string;
+    description?: string;
+    source?: string;
+    step?: string;
+    reason?: string;
+    metadata?: Record<string, unknown>;
+  };
+}
+
 export interface RazorpayInstance {
   open: () => void;
-  on: (event: string, handler: (response: any) => void) => void;
+  on: (event: "payment.failed", handler: (response: RazorpayPaymentFailedResponse) => void) => void;
 }
 
 export {};

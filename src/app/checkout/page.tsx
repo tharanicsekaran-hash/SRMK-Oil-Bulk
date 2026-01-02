@@ -9,6 +9,7 @@ import { useRouter } from "next/navigation";
 import { MapPin, Plus } from "lucide-react";
 import AddressModal from "@/components/AddressModal";
 import OrderSuccessModal from "@/components/OrderSuccessModal";
+import type { RazorpayOptions, RazorpayPaymentResponse, RazorpayInstance, RazorpayPaymentFailedResponse } from "@/types/razorpay";
 
 type SavedAddress = {
   id: string;
@@ -269,7 +270,6 @@ export default function CheckoutPage() {
             orderId: dbOrderId,
             customerName: name,
             customerPhone: phone,
-            customerEmail: session?.user?.email || undefined,
           }),
         });
 
@@ -280,18 +280,14 @@ export default function CheckoutPage() {
         const razorpayData = await razorpayRes.json();
 
         // Open Razorpay checkout
-        const options = {
+        const options: RazorpayOptions = {
           key: razorpayData.key,
           amount: razorpayData.amount,
           currency: razorpayData.currency,
           name: "SRMK Oil Mill",
           description: `Order #${dbOrderId}`,
           order_id: razorpayData.razorpayOrderId,
-          handler: async function (response: {
-            razorpay_payment_id: string;
-            razorpay_order_id: string;
-            razorpay_signature: string;
-          }) {
+          handler: async function (response: RazorpayPaymentResponse) {
             try {
               // Verify payment
               const verifyRes = await fetch("/api/payments/razorpay/verify", {
@@ -334,7 +330,6 @@ export default function CheckoutPage() {
           prefill: {
             name: name,
             contact: phone,
-            email: session?.user?.email || "",
           },
           theme: {
             color: "#d97706",
@@ -347,9 +342,9 @@ export default function CheckoutPage() {
         };
 
         // Check if Razorpay is loaded
-        if (typeof window !== "undefined" && (window as any).Razorpay) {
-          const razorpayInstance = new (window as any).Razorpay(options);
-          razorpayInstance.on("payment.failed", function (response: any) {
+        if (typeof window !== "undefined" && window.Razorpay) {
+          const razorpayInstance: RazorpayInstance = new window.Razorpay(options);
+          razorpayInstance.on("payment.failed", function (response: RazorpayPaymentFailedResponse) {
             alert(
               locale === "en"
                 ? `Payment failed: ${response.error.description || "Unknown error"}`

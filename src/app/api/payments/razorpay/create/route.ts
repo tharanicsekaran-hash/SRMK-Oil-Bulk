@@ -10,13 +10,11 @@ export async function POST(request: NextRequest) {
       orderId, // Our database order ID
       customerName,
       customerPhone,
-      customerEmail,
     } = body as {
       amountPaisa: number;
       orderId: string;
       customerName?: string;
       customerPhone?: string;
-      customerEmail?: string;
     };
 
     if (!amountPaisa || !orderId) {
