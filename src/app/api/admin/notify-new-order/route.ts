@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
 
     // Prepare email content
     const emailContent = {
-      to: "selvaraj.whizzkid@gmail.com",
+      to: "tharanicsekaran@gmail.com",
       subject: `🎉 New Order #${order.id.slice(-8)} - ₹${(order.totalPaisa / 100).toFixed(2)}`,
       body: `
 🎉 NEW ORDER RECEIVED!
@@ -93,13 +93,9 @@ SRMK Oil Mill - Admin Notification
         // Initialize Resend with API key (only when needed)
         const resend = new Resend(process.env.RESEND_API_KEY);
         
-        // Use verified domain if available, otherwise use Resend test domain
-        // In production, if domain is not verified, use test domain
-        const fromEmail = process.env.NODE_ENV === "production" 
-          ? (process.env.RESEND_VERIFIED_DOMAIN === "true" 
-              ? "SRMK Oil Mill <orders@srmkoilmill.in>"
-              : "onboarding@resend.dev") // Fallback to test domain
-          : "SRMK Oil Mill <orders@srmkoilmill.in>"; // Localhost can use any domain
+        // Use Resend's default sending domain (onboarding@resend.dev)
+        // This works without domain verification
+        const fromEmail = "SRMK Oil Mill <onboarding@resend.dev>";
         
         console.log("📧 From email:", fromEmail);
         
