@@ -21,7 +21,6 @@ function AuthContent() {
   const [loginStep, setLoginStep] = useState<AuthStep>("phone");
   const [loginPhone, setLoginPhone] = useState("");
   const [loginOtp, setLoginOtp] = useState("");
-  const [loginOtpExpiry, setLoginOtpExpiry] = useState<number>(0);
   const [loginAttemptsLeft, setLoginAttemptsLeft] = useState(3);
 
   // Signup state
@@ -29,7 +28,6 @@ function AuthContent() {
   const [signupName, setSignupName] = useState("");
   const [signupPhone, setSignupPhone] = useState("");
   const [signupOtp, setSignupOtp] = useState("");
-  const [signupOtpExpiry, setSignupOtpExpiry] = useState<number>(0);
   const [signupAttemptsLeft, setSignupAttemptsLeft] = useState(3);
 
   // Timer for OTP expiry display
@@ -70,7 +68,6 @@ function AuthContent() {
         showToast(`DEV MODE - OTP: ${data.devOtp}`, "info");
       }
 
-      setLoginOtpExpiry(data.expiresIn || 300);
       setRemainingTime(data.expiresIn || 300);
       setLoginStep("otp");
 
@@ -179,7 +176,6 @@ function AuthContent() {
         showToast(`DEV MODE - OTP: ${data.devOtp}`, "info");
       }
 
-      setSignupOtpExpiry(data.expiresIn || 300);
       setRemainingTime(data.expiresIn || 300);
       setSignupStep("otp");
 
@@ -443,9 +439,9 @@ function AuthContent() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => {
+                    onClick={async () => {
                       resetLoginFlow();
-                      handleLoginSendOtp(new Event('submit') as any);
+                      await handleLoginSendOtp({ preventDefault: () => {} } as React.FormEvent);
                     }}
                     disabled={loading}
                     className="w-full text-sm text-orange-600 hover:underline disabled:opacity-50"
@@ -564,9 +560,9 @@ function AuthContent() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => {
+                    onClick={async () => {
                       resetSignupFlow();
-                      handleSignupSendOtp(new Event('submit') as any);
+                      await handleSignupSendOtp({ preventDefault: () => {} } as React.FormEvent);
                     }}
                     disabled={loading}
                     className="w-full text-sm text-orange-600 hover:underline disabled:opacity-50"
