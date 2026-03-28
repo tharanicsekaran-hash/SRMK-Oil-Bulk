@@ -56,7 +56,7 @@ export default function AdminAuthPage() {
     setIsLoading(true);
 
     try {
-      const result = await signIn("credentials", {
+      const result = await signIn("password", {
         phone: loginPhone,
         password: loginPassword,
         redirect: false,

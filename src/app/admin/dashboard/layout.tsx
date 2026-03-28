@@ -3,6 +3,7 @@
 import { useSession, signOut } from "next-auth/react";
 import { usePathname, useRouter } from "next/navigation";
 import { ReactNode, useState, useEffect } from "react";
+import Image from "next/image";
 import {
   LayoutDashboard,
   Package,
@@ -234,7 +235,13 @@ export default function AdminDashboardLayout({ children }: AdminLayoutProps) {
                 <Shield className="w-6 h-6 text-white" />
               </div>
               <div>
-                <h2 className="font-bold text-gray-900">SRMK Oil Mill</h2>
+                <Image 
+                  src="/logo.png" 
+                  alt="SRMK Oil Mill" 
+                  width={120} 
+                  height={35} 
+                  className="h-6 md:h-7 w-auto mb-1"
+                />
                 <p className="text-xs text-gray-600 capitalize">{userRole?.toLowerCase()} Access</p>
               </div>
             </div>
@@ -349,7 +356,13 @@ export default function AdminDashboardLayout({ children }: AdminLayoutProps) {
 
             {/* Centered Logo/Company Name */}
             <div className="flex-1 flex justify-center">
-              <h1 className="text-xl font-bold text-[#d97706]">SRMK Oil Mill</h1>
+              <Image 
+                src="/logo.png" 
+                alt="SRMK Oil Mill" 
+                width={140} 
+                height={40} 
+                className="h-7 md:h-9 w-auto"
+              />
             </div>
 
             {/* Mobile: Current Page Title */}

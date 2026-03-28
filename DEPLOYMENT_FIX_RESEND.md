@@ -241,4 +241,3 @@ Vercel Dashboard → Your Project → Deployments → Latest → View Function L
 ---
 
 **The fix is deployed! Check Vercel in 1-2 minutes for build success.** ✨
-

@@ -122,4 +122,3 @@ Variants sorted in logical order:
 ---
 
 **The products page now matches your original design intent!** 🎉
-

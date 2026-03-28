@@ -451,12 +451,19 @@ export default function ProductsPage() {
                     Price (₹) *
                   </label>
                   <input
-                    type="number"
-                    step="0.01"
+                    type="text"
+                    inputMode="decimal"
                     value={(formData.pricePaisa / 100).toFixed(2)}
-                    onChange={(e) =>
-                      setFormData({ ...formData, pricePaisa: Math.round(parseFloat(e.target.value) * 100) })
-                    }
+                    onChange={(e) => {
+                      const value = e.target.value.replace(/[^0-9.]/g, '');
+                      const numValue = parseFloat(value);
+                      if (!isNaN(numValue)) {
+                        setFormData({ ...formData, pricePaisa: Math.round(numValue * 100) });
+                      } else if (value === '' || value === '.') {
+                        setFormData({ ...formData, pricePaisa: 0 });
+                      }
+                    }}
+                    placeholder="e.g., 280.00"
                     required
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
@@ -515,11 +522,14 @@ export default function ProductsPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Image URL</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Image URL <span className="text-xs text-gray-500">- Relative or full URL</span>
+                  </label>
                   <input
-                    type="url"
+                    type="text"
                     value={formData.imageUrl}
                     onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
+                    placeholder="e.g., /images/coconut.jpg or https://..."
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
                 </div>

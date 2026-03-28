@@ -5,8 +5,8 @@ import { useSearchParams } from "next/navigation";
 import { useI18n } from "@/components/LanguageProvider";
 import { useToast } from "@/store/toast";
 
-type Tab = "login" | "signup" | "forgot";
-type ForgotStep = "phone" | "otp" | "password";
+type Tab = "login" | "signup";
+type AuthStep = "phone" | "otp";
 
 function AuthContent() {
   const searchParams = useSearchParams();
@@ -18,43 +18,120 @@ function AuthContent() {
   const [loading, setLoading] = useState(false);
 
   // Login state
+  const [loginStep, setLoginStep] = useState<AuthStep>("phone");
   const [loginPhone, setLoginPhone] = useState("");
-  const [loginPassword, setLoginPassword] = useState("");
+  const [loginOtp, setLoginOtp] = useState("");
+  const [loginOtpExpiry, setLoginOtpExpiry] = useState<number>(0);
+  const [loginAttemptsLeft, setLoginAttemptsLeft] = useState(3);
 
   // Signup state
+  const [signupStep, setSignupStep] = useState<AuthStep>("phone");
   const [signupName, setSignupName] = useState("");
   const [signupPhone, setSignupPhone] = useState("");
-  const [signupPassword, setSignupPassword] = useState("");
+  const [signupOtp, setSignupOtp] = useState("");
+  const [signupOtpExpiry, setSignupOtpExpiry] = useState<number>(0);
+  const [signupAttemptsLeft, setSignupAttemptsLeft] = useState(3);
 
-  // Forgot password state
-  const [forgotStep, setForgotStep] = useState<ForgotStep>("phone");
-  const [forgotPhone, setForgotPhone] = useState("");
-  const [forgotOtp, setForgotOtp] = useState("");
-  const [forgotNewPassword, setForgotNewPassword] = useState("");
-  const [verificationToken, setVerificationToken] = useState("");
-  const [otpAttemptsLeft, setOtpAttemptsLeft] = useState(3);
+  // Timer for OTP expiry display
+  const [remainingTime, setRemainingTime] = useState(0);
 
-  const handleLogin = async (e: React.FormEvent) => {
+  // Handle Send OTP for Login
+  const handleLoginSendOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
     try {
-      const result = await signIn("credentials", {
+      const response = await fetch("/api/auth/send-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          phone: loginPhone,
+          action: 'login'
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        showToast(data.error, "error");
+        return;
+      }
+
+      showToast(
+        locale === "en" 
+          ? `OTP sent to ${loginPhone}` 
+          : `${loginPhone} க்கு OTP அனுப்பப்பட்டது`,
+        "success"
+      );
+      
+      // Show dev OTP in development mode
+      if (data.devOtp && process.env.NODE_ENV === 'development') {
+        console.log("🔐 DEV OTP:", data.devOtp);
+        showToast(`DEV MODE - OTP: ${data.devOtp}`, "info");
+      }
+
+      setLoginOtpExpiry(data.expiresIn || 300);
+      setRemainingTime(data.expiresIn || 300);
+      setLoginStep("otp");
+
+      // Start countdown timer
+      const timer = setInterval(() => {
+        setRemainingTime((prev) => {
+          if (prev <= 1) {
+            clearInterval(timer);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    } catch {
+      showToast(
+        locale === "en" ? "Failed to send OTP" : "OTP அனுப்ப முடியவில்லை",
+        "error"
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handle Verify OTP and Login
+  const handleLoginVerifyOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+
+    try {
+      // Sign in with NextAuth using OTP provider
+      const result = await signIn("otp", {
         phone: loginPhone,
-        password: loginPassword,
+        otp: loginOtp,
         redirect: false,
       });
 
       if (result?.error) {
         showToast(result.error, "error");
+        setLoginAttemptsLeft(prev => prev - 1);
       } else if (result?.ok) {
         showToast(
           locale === "en" ? "Login successful!" : "உள்நுழைவு வெற்றிகரமாக!",
           "success"
         );
+        
+        // Fetch session to get user role and redirect accordingly
+        const sessionResponse = await fetch('/api/auth/session');
+        const session = await sessionResponse.json();
+        
+        // Role-based redirect
+        let finalRedirectUrl = redirectUrl;
+        if (session?.user?.role === 'ADMIN' || session?.user?.role === 'DELIVERY') {
+          finalRedirectUrl = '/admin/dashboard';
+        } else {
+          // Customer role - use default or provided redirect
+          finalRedirectUrl = redirectUrl;
+        }
+        
         // Use window.location for hard redirect to ensure session is loaded
         setTimeout(() => {
-          window.location.href = redirectUrl;
+          window.location.href = finalRedirectUrl;
         }, 500);
       }
     } catch {
@@ -67,18 +144,18 @@ function AuthContent() {
     }
   };
 
-  const handleSignup = async (e: React.FormEvent) => {
+  // Handle Send OTP for Signup
+  const handleSignupSendOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
     try {
-      const response = await fetch("/api/auth/register", {
+      const response = await fetch("/api/auth/send-otp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: signupName,
+        body: JSON.stringify({ 
           phone: signupPhone,
-          password: signupPassword,
+          action: 'signup'
         }),
       });
 
@@ -90,46 +167,32 @@ function AuthContent() {
       }
 
       showToast(
-        locale === "en"
-          ? "Account created! Please login."
-          : "கணக்கு உருவாக்கப்பட்டது! உள்நுழையவும்.",
+        locale === "en" 
+          ? `OTP sent to ${signupPhone}` 
+          : `${signupPhone} க்கு OTP அனுப்பப்பட்டது`,
         "success"
       );
 
-      // Auto-fill login form
-      setLoginPhone(signupPhone);
-      setLoginPassword(signupPassword);
-      setTab("login");
-    } catch {
-      showToast(
-        locale === "en" ? "Signup failed" : "பதிவு தோல்வியுற்றது",
-        "error"
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleSendOtp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-
-    try {
-      const response = await fetch("/api/auth/send-otp", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone: forgotPhone }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        showToast(data.error, "error");
-        return;
+      // Show dev OTP in development mode
+      if (data.devOtp && process.env.NODE_ENV === 'development') {
+        console.log("🔐 DEV OTP:", data.devOtp);
+        showToast(`DEV MODE - OTP: ${data.devOtp}`, "info");
       }
 
-      showToast(data.message, "success");
-      setForgotStep("otp");
+      setSignupOtpExpiry(data.expiresIn || 300);
+      setRemainingTime(data.expiresIn || 300);
+      setSignupStep("otp");
+
+      // Start countdown timer
+      const timer = setInterval(() => {
+        setRemainingTime((prev) => {
+          if (prev <= 1) {
+            clearInterval(timer);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
     } catch {
       showToast(
         locale === "en" ? "Failed to send OTP" : "OTP அனுப்ப முடியவில்லை",
@@ -140,7 +203,8 @@ function AuthContent() {
     }
   };
 
-  const handleVerifyOtp = async (e: React.FormEvent) => {
+  // Handle Verify OTP and Create Account
+  const handleSignupVerifyOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
@@ -148,25 +212,76 @@ function AuthContent() {
       const response = await fetch("/api/auth/verify-otp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone: forgotPhone, otp: forgotOtp }),
+        body: JSON.stringify({
+          phone: signupPhone,
+          otp: signupOtp,
+          action: 'signup',
+          name: signupName,
+        }),
       });
 
       const data = await response.json();
 
       if (!response.ok) {
         if (data.attemptsLeft !== undefined) {
-          setOtpAttemptsLeft(data.attemptsLeft);
+          setSignupAttemptsLeft(data.attemptsLeft);
         }
         showToast(data.error, "error");
         return;
       }
 
-      setVerificationToken(data.verificationToken);
-      showToast(data.message, "success");
-      setForgotStep("password");
+      showToast(
+        locale === "en"
+          ? "Account created! Logging you in..."
+          : "கணக்கு உருவாக்கப்பட்டது! உள்நுழைகிறது...",
+        "success"
+      );
+
+      // Wait a moment before auto-login to ensure database is updated
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      // Auto-login after signup using the same OTP
+      const loginResult = await signIn("otp", {
+        phone: signupPhone,
+        otp: signupOtp,
+        redirect: false,
+      });
+
+      if (loginResult?.error) {
+        console.error("Auto-login error:", loginResult.error);
+        // If auto-login fails, switch to login tab
+        setLoginPhone(signupPhone);
+        setTab("login");
+        setLoginStep("phone");
+        showToast(
+          locale === "en"
+            ? "Account created! Please login to continue."
+            : "கணக்கு உருவாக்கப்பட்டது! தொடர உள்நுழையவும்.",
+          "info"
+        );
+        return;
+      }
+
+      if (loginResult?.ok) {
+        // Fetch session to get user role
+        const sessionResponse = await fetch('/api/auth/session');
+        const session = await sessionResponse.json();
+        
+        // Role-based redirect (new customers should be CUSTOMER role)
+        let finalRedirectUrl = redirectUrl;
+        if (session?.user?.role === 'ADMIN' || session?.user?.role === 'DELIVERY') {
+          finalRedirectUrl = '/admin/dashboard';
+        } else {
+          finalRedirectUrl = redirectUrl;
+        }
+        
+        setTimeout(() => {
+          window.location.href = finalRedirectUrl;
+        }, 500);
+      }
     } catch {
       showToast(
-        locale === "en" ? "Failed to verify OTP" : "OTP சரிபார்க்க முடியவில்லை",
+        locale === "en" ? "Signup failed" : "பதிவு தோல்வியுற்றது",
         "error"
       );
     } finally {
@@ -174,52 +289,25 @@ function AuthContent() {
     }
   };
 
-  const handleResetPassword = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
+  // Helper to format time (MM:SS)
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
 
-    try {
-      const response = await fetch("/api/auth/reset-password", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          phone: forgotPhone,
-          newPassword: forgotNewPassword,
-          verificationToken,
-        }),
-      });
+  // Reset login flow
+  const resetLoginFlow = () => {
+    setLoginStep("phone");
+    setLoginOtp("");
+    setLoginAttemptsLeft(3);
+  };
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        showToast(data.error, "error");
-        return;
-      }
-
-      showToast(
-        locale === "en"
-          ? "Password reset successful! Please login."
-          : "கடவுச்சொல் மீட்டமைக்கப்பட்டது! உள்நுழையவும்.",
-        "success"
-      );
-
-      // Reset forgot password state and switch to login
-      setForgotStep("phone");
-      setForgotPhone("");
-      setForgotOtp("");
-      setForgotNewPassword("");
-      setVerificationToken("");
-      setTab("login");
-    } catch {
-      showToast(
-        locale === "en"
-          ? "Failed to reset password"
-          : "கடவுச்சொல் மீட்டமைக்க முடியவில்லை",
-        "error"
-      );
-    } finally {
-      setLoading(false);
-    }
+  // Reset signup flow
+  const resetSignupFlow = () => {
+    setSignupStep("phone");
+    setSignupOtp("");
+    setSignupAttemptsLeft(3);
   };
 
   return (
@@ -233,7 +321,10 @@ function AuthContent() {
           {/* Tabs */}
           <div className="flex border-b">
             <button
-              onClick={() => setTab("login")}
+              onClick={() => {
+                setTab("login");
+                resetLoginFlow();
+              }}
               className={`flex-1 py-2 text-sm font-medium border-b-2 transition ${
                 tab === "login"
                   ? "border-orange-600 text-orange-600"
@@ -243,7 +334,10 @@ function AuthContent() {
               {locale === "en" ? "Login" : "உள்நுழைவு"}
             </button>
             <button
-              onClick={() => setTab("signup")}
+              onClick={() => {
+                setTab("signup");
+                resetSignupFlow();
+              }}
               className={`flex-1 py-2 text-sm font-medium border-b-2 transition ${
                 tab === "signup"
                   ? "border-orange-600 text-orange-600"
@@ -254,141 +348,20 @@ function AuthContent() {
             </button>
           </div>
 
-          {/* Login Form */}
+          {/* LOGIN TAB */}
           {tab === "login" && (
-            <form onSubmit={handleLogin} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium mb-1">
-                  {locale === "en" ? "Phone Number" : "தொலைபேசி எண்"}
-                </label>
-                <input
-                  type="tel"
-                  value={loginPhone}
-                  onChange={(e) =>
-                    setLoginPhone(e.target.value.replace(/\D/g, "").slice(0, 10))
-                  }
-                  placeholder="10 digits"
-                  className="w-full border rounded px-3 py-2"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">
-                  {locale === "en" ? "Password" : "கடவுச்சொல்"}
-                </label>
-                <input
-                  type="password"
-                  value={loginPassword}
-                  onChange={(e) => setLoginPassword(e.target.value)}
-                  placeholder="Min 6 characters"
-                  className="w-full border rounded px-3 py-2"
-                  required
-                />
-              </div>
-              <button
-                type="button"
-                onClick={() => setTab("forgot")}
-                className="text-sm text-orange-600 hover:underline"
-              >
-                {locale === "en" ? "Forgot Password?" : "கடவுச்சொல் மறந்துவிட்டதா?"}
-              </button>
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full bg-orange-600 text-white py-2 rounded hover:bg-orange-700 disabled:opacity-50"
-              >
-                {loading
-                  ? locale === "en"
-                    ? "Logging in..."
-                    : "உள்நுழைகிறது..."
-                  : locale === "en"
-                  ? "Login"
-                  : "உள்நுழைவு"}
-              </button>
-            </form>
-          )}
-
-          {/* Signup Form */}
-          {tab === "signup" && (
-            <form onSubmit={handleSignup} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium mb-1">
-                  {locale === "en" ? "Name (Optional)" : "பெயர் (விருப்பமானது)"}
-                </label>
-                <input
-                  type="text"
-                  value={signupName}
-                  onChange={(e) => setSignupName(e.target.value)}
-                  placeholder={locale === "en" ? "Your name" : "உங்கள் பெயர்"}
-                  className="w-full border rounded px-3 py-2"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">
-                  {locale === "en" ? "Phone Number" : "தொலைபேசி எண்"} *
-                </label>
-                <input
-                  type="tel"
-                  value={signupPhone}
-                  onChange={(e) =>
-                    setSignupPhone(e.target.value.replace(/\D/g, "").slice(0, 10))
-                  }
-                  placeholder="10 digits"
-                  className="w-full border rounded px-3 py-2"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">
-                  {locale === "en" ? "Password" : "கடவுச்சொல்"} *
-                </label>
-                <input
-                  type="password"
-                  value={signupPassword}
-                  onChange={(e) => setSignupPassword(e.target.value)}
-                  placeholder="Min 6 characters"
-                  className="w-full border rounded px-3 py-2"
-                  required
-                />
-              </div>
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full bg-orange-600 text-white py-2 rounded hover:bg-orange-700 disabled:opacity-50"
-              >
-                {loading
-                  ? locale === "en"
-                    ? "Creating account..."
-                    : "கணக்கை உருவாக்குகிறது..."
-                  : locale === "en"
-                  ? "Create Account"
-                  : "கணக்கை உருவாக்கவும்"}
-              </button>
-            </form>
-          )}
-
-          {/* Forgot Password Flow */}
-          {tab === "forgot" && (
             <div className="space-y-4">
-              <button
-                onClick={() => setTab("login")}
-                className="text-sm text-gray-600 hover:text-gray-800 flex items-center gap-1"
-              >
-                ← {locale === "en" ? "Back to Login" : "உள்நுழைவுக்குத் திரும்பு"}
-              </button>
-
-              {/* Step 1: Enter Phone */}
-              {forgotStep === "phone" && (
-                <form onSubmit={handleSendOtp} className="space-y-4">
+              {loginStep === "phone" && (
+                <form onSubmit={handleLoginSendOtp} className="space-y-4">
                   <div>
                     <label className="block text-sm font-medium mb-1">
                       {locale === "en" ? "Phone Number" : "தொலைபேசி எண்"}
                     </label>
                     <input
                       type="tel"
-                      value={forgotPhone}
+                      value={loginPhone}
                       onChange={(e) =>
-                        setForgotPhone(e.target.value.replace(/\D/g, "").slice(0, 10))
+                        setLoginPhone(e.target.value.replace(/\D/g, "").slice(0, 10))
                       }
                       placeholder="10 digits"
                       className="w-full border rounded px-3 py-2"
@@ -397,8 +370,8 @@ function AuthContent() {
                   </div>
                   <button
                     type="submit"
-                    disabled={loading}
-                    className="w-full bg-orange-600 text-white py-2 rounded hover:bg-orange-700 disabled:opacity-50"
+                    disabled={loading || loginPhone.length !== 10}
+                    className="w-full bg-orange-600 text-white py-2 rounded hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {loading
                       ? locale === "en"
@@ -410,87 +383,195 @@ function AuthContent() {
                   </button>
                   <p className="text-xs text-gray-500 text-center">
                     {locale === "en"
-                      ? "Development Mode: OTP is always 123456"
-                      : "மேம்பாட்டு முறை: OTP எப்போதும் 123456"}
+                      ? "We'll send you a one-time password"
+                      : "உங்களுக்கு ஒரு முறை கடவுச்சொல் அனுப்பப்படும்"}
                   </p>
                 </form>
               )}
 
-              {/* Step 2: Verify OTP */}
-              {forgotStep === "otp" && (
-                <form onSubmit={handleVerifyOtp} className="space-y-4">
+              {loginStep === "otp" && (
+                <form onSubmit={handleLoginVerifyOtp} className="space-y-4">
                   <div>
                     <label className="block text-sm font-medium mb-1">
                       {locale === "en" ? "Enter OTP" : "OTP உள்ளிடவும்"}
                     </label>
                     <input
                       type="text"
-                      value={forgotOtp}
+                      value={loginOtp}
                       onChange={(e) =>
-                        setForgotOtp(e.target.value.replace(/\D/g, "").slice(0, 6))
+                        setLoginOtp(e.target.value.replace(/\D/g, "").slice(0, 6))
                       }
-                      placeholder="123456"
+                      placeholder="6-digit OTP"
                       className="w-full border rounded px-3 py-2 text-center text-2xl tracking-widest"
                       required
                       maxLength={6}
+                      autoFocus
                     />
-                    <p className="text-xs text-gray-500 mt-1">
-                      {locale === "en"
-                        ? `Attempts left: ${otpAttemptsLeft}`
-                        : `மீதமுள்ள முயற்சிகள்: ${otpAttemptsLeft}`}
-                    </p>
+                    <div className="flex justify-between items-center mt-2">
+                      <p className="text-xs text-gray-500">
+                        {locale === "en"
+                          ? `Attempts left: ${loginAttemptsLeft}`
+                          : `மீதமுள்ள முயற்சிகள்: ${loginAttemptsLeft}`}
+                      </p>
+                      {remainingTime > 0 && (
+                        <p className="text-xs text-gray-500">
+                          {locale === "en" ? "Expires in: " : "காலாவதியாகும்: "}
+                          <span className="font-semibold">{formatTime(remainingTime)}</span>
+                        </p>
+                      )}
+                    </div>
                   </div>
                   <button
                     type="submit"
-                    disabled={loading}
-                    className="w-full bg-orange-600 text-white py-2 rounded hover:bg-orange-700 disabled:opacity-50"
+                    disabled={loading || loginOtp.length !== 6}
+                    className="w-full bg-orange-600 text-white py-2 rounded hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {loading
                       ? locale === "en"
                         ? "Verifying..."
                         : "சரிபார்க்கிறது..."
                       : locale === "en"
-                      ? "Verify OTP"
-                      : "OTP சரிபார்க்கவும்"}
+                      ? "Verify & Login"
+                      : "சரிபார்த்து உள்நுழையவும்"}
                   </button>
                   <button
                     type="button"
-                    onClick={() => setForgotStep("phone")}
+                    onClick={resetLoginFlow}
                     className="w-full text-sm text-gray-600 hover:text-gray-800"
+                  >
+                    ← {locale === "en" ? "Change Phone Number" : "எண்ணை மாற்றவும்"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      resetLoginFlow();
+                      handleLoginSendOtp(new Event('submit') as any);
+                    }}
+                    disabled={loading}
+                    className="w-full text-sm text-orange-600 hover:underline disabled:opacity-50"
                   >
                     {locale === "en" ? "Resend OTP" : "OTP மீண்டும் அனுப்பவும்"}
                   </button>
                 </form>
               )}
+            </div>
+          )}
 
-              {/* Step 3: Set New Password */}
-              {forgotStep === "password" && (
-                <form onSubmit={handleResetPassword} className="space-y-4">
+          {/* SIGNUP TAB */}
+          {tab === "signup" && (
+            <div className="space-y-4">
+              {signupStep === "phone" && (
+                <form onSubmit={handleSignupSendOtp} className="space-y-4">
                   <div>
                     <label className="block text-sm font-medium mb-1">
-                      {locale === "en" ? "New Password" : "புதிய கடவுச்சொல்"}
+                      {locale === "en" ? "Name (Optional)" : "பெயர் (விருப்பமானது)"}
                     </label>
                     <input
-                      type="password"
-                      value={forgotNewPassword}
-                      onChange={(e) => setForgotNewPassword(e.target.value)}
-                      placeholder="Min 6 characters"
+                      type="text"
+                      value={signupName}
+                      onChange={(e) => setSignupName(e.target.value)}
+                      placeholder={locale === "en" ? "Your name" : "உங்கள் பெயர்"}
+                      className="w-full border rounded px-3 py-2"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">
+                      {locale === "en" ? "Phone Number" : "தொலைபேசி எண்"} *
+                    </label>
+                    <input
+                      type="tel"
+                      value={signupPhone}
+                      onChange={(e) =>
+                        setSignupPhone(e.target.value.replace(/\D/g, "").slice(0, 10))
+                      }
+                      placeholder="10 digits"
                       className="w-full border rounded px-3 py-2"
                       required
                     />
                   </div>
                   <button
                     type="submit"
-                    disabled={loading}
-                    className="w-full bg-orange-600 text-white py-2 rounded hover:bg-orange-700 disabled:opacity-50"
+                    disabled={loading || signupPhone.length !== 10}
+                    className="w-full bg-orange-600 text-white py-2 rounded hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {loading
                       ? locale === "en"
-                        ? "Resetting..."
-                        : "மீட்டமைக்கிறது..."
+                        ? "Sending OTP..."
+                        : "OTP அனுப்புகிறது..."
                       : locale === "en"
-                      ? "Reset Password"
-                      : "கடவுச்சொல்லை மீட்டமைக்கவும்"}
+                      ? "Send OTP"
+                      : "OTP அனுப்பவும்"}
+                  </button>
+                  <p className="text-xs text-gray-500 text-center">
+                    {locale === "en"
+                      ? "We'll verify your phone with an OTP"
+                      : "OTP மூலம் உங்கள் தொலைபேசியை சரிபார்ப்போம்"}
+                  </p>
+                </form>
+              )}
+
+              {signupStep === "otp" && (
+                <form onSubmit={handleSignupVerifyOtp} className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-1">
+                      {locale === "en" ? "Enter OTP" : "OTP உள்ளிடவும்"}
+                    </label>
+                    <input
+                      type="text"
+                      value={signupOtp}
+                      onChange={(e) =>
+                        setSignupOtp(e.target.value.replace(/\D/g, "").slice(0, 6))
+                      }
+                      placeholder="6-digit OTP"
+                      className="w-full border rounded px-3 py-2 text-center text-2xl tracking-widest"
+                      required
+                      maxLength={6}
+                      autoFocus
+                    />
+                    <div className="flex justify-between items-center mt-2">
+                      <p className="text-xs text-gray-500">
+                        {locale === "en"
+                          ? `Attempts left: ${signupAttemptsLeft}`
+                          : `மீதமுள்ள முயற்சிகள்: ${signupAttemptsLeft}`}
+                      </p>
+                      {remainingTime > 0 && (
+                        <p className="text-xs text-gray-500">
+                          {locale === "en" ? "Expires in: " : "காலாவதியாகும்: "}
+                          <span className="font-semibold">{formatTime(remainingTime)}</span>
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={loading || signupOtp.length !== 6}
+                    className="w-full bg-orange-600 text-white py-2 rounded hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {loading
+                      ? locale === "en"
+                        ? "Creating account..."
+                        : "கணக்கை உருவாக்குகிறது..."
+                      : locale === "en"
+                      ? "Verify & Create Account"
+                      : "சரிபார்த்து கணக்கை உருவாக்கவும்"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={resetSignupFlow}
+                    className="w-full text-sm text-gray-600 hover:text-gray-800"
+                  >
+                    ← {locale === "en" ? "Change Phone Number" : "எண்ணை மாற்றவும்"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      resetSignupFlow();
+                      handleSignupSendOtp(new Event('submit') as any);
+                    }}
+                    disabled={loading}
+                    className="w-full text-sm text-orange-600 hover:underline disabled:opacity-50"
+                  >
+                    {locale === "en" ? "Resend OTP" : "OTP மீண்டும் அனுப்பவும்"}
                   </button>
                 </form>
               )}
@@ -513,4 +594,3 @@ export default function AuthPage() {
     </Suspense>
   );
 }
-

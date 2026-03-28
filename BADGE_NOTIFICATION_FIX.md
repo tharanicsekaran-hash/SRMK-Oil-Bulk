@@ -320,4 +320,3 @@ Badge system is working correctly when:
 ---
 
 **Ready to test! The page should auto-reload with the new changes.** 🚀
-

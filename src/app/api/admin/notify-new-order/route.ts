@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
 
     // Prepare email content
     const emailContent = {
-      to: "tharanicsekaran@gmail.com",
+      to: "selvaraj.whizzkid@gmail.com",
       subject: `🎉 New Order #${order.id.slice(-8)} - ₹${(order.totalPaisa / 100).toFixed(2)}`,
       body: `
 🎉 NEW ORDER RECEIVED!

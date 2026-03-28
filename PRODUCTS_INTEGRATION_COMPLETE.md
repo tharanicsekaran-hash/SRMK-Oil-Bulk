@@ -138,4 +138,3 @@ All **11 products** (4 product types with different sizes) are now imported into
 **Everything is now connected and working perfectly!** 🎉
 
 Any product changes you make in the admin panel will **immediately reflect** on the customer-facing products page.
-

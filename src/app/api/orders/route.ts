@@ -104,17 +104,22 @@ export async function POST(req: Request) {
 
     console.log("✅ Order created successfully:", order.id);
 
-    // Send email notification to admin (fire and forget - don't wait for response)
-    const notificationUrl = `${process.env.NEXTAUTH_URL || "http://localhost:4000"}/api/admin/notify-new-order`;
-    console.log("📧 Triggering email notification to:", notificationUrl);
-    
-    fetch(notificationUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ orderId: order.id }),
-    })
-      .then((res) => console.log("📧 Email notification response:", res.status))
-      .catch((err) => console.error("❌ Failed to send admin notification:", err));
+    // Send email notification ONLY for COD orders
+    // For Razorpay/online payments, email will be sent after payment verification
+    if (paymentMethod === "COD") {
+      const notificationUrl = `${process.env.NEXTAUTH_URL || "http://localhost:4000"}/api/admin/notify-new-order`;
+      console.log("📧 Triggering email notification to:", notificationUrl);
+      
+      fetch(notificationUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId: order.id }),
+      })
+        .then((res) => console.log("📧 Email notification response:", res.status))
+        .catch((err) => console.error("❌ Failed to send admin notification:", err));
+    } else {
+      console.log("⏳ Skipping email for Razorpay order - will send after payment verification");
+    }
 
     return NextResponse.json({ ok: true, order });
   } catch (e: unknown) {

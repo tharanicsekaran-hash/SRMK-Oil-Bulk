@@ -274,4 +274,3 @@ Body: [full email]
 ---
 
 **Need help? Check the terminal logs for detailed debugging information!**
-

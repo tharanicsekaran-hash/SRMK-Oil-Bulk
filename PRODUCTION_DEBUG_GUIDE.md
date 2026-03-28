@@ -364,4 +364,3 @@ Error: Can't reach database server at db.vugpgnsvcqqbstbmeqyu.supabase.co:5432
 ---
 
 **Let me know the health check response and I'll guide you through the fix!** 🔍
-

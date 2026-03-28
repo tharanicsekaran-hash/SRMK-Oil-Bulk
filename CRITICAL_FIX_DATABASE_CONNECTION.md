@@ -262,4 +262,3 @@ vercel logs [deployment-url]
 4. Test
 
 **DO THIS NOW! ⚡**
-

@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import Image from "next/image";
 import { useSession, signOut } from "next-auth/react";
 import { useI18n } from "@/components/LanguageProvider";
 import { useCart } from "@/store/cart";
@@ -32,8 +33,15 @@ export default function Header() {
   return (
     <header className="border-b border-[#f0e6d8] bg-white/70 backdrop-blur supports-[backdrop-filter]:bg-white/60 sticky top-0 z-40">
       <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
-        <Link href="/" className="text-lg font-semibold">
-          {t.brand.name}
+        <Link href="/" className="flex items-center">
+          <Image 
+            src="/logo.png" 
+            alt="SRMK Oil Mill" 
+            width={140} 
+            height={40} 
+            className="h-7 md:h-8 w-auto"
+            priority
+          />
         </Link>
         <nav className="hidden md:flex items-center gap-4 text-sm">
           <Link href="/" className="hover:text-[#d97706]">{t.nav.home}</Link>
