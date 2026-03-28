@@ -137,7 +137,7 @@ export default function CreateOrderModal({
       (sum, item) => sum + item.pricePaisa * item.quantity,
       0
     );
-    const deliveryCharge = subtotal < 50000 ? 5000 : 0;
+    const deliveryCharge = 0; // Free delivery
     return { subtotal, deliveryCharge, total: subtotal + deliveryCharge };
   };
 

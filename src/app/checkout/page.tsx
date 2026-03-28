@@ -56,7 +56,7 @@ export default function CheckoutPage() {
   const [showSuccessModal, setShowSuccessModal] = useState(false);
 
   const subtotal = items.reduce((sum, i) => sum + i.pricePaisa * i.qty, 0);
-  const deliveryChargePaisa = subtotal < 50000 ? 5000 : 0;
+  const deliveryChargePaisa = 0; // Free delivery
   const totalPaisa = subtotal + deliveryChargePaisa;
 
   // Fetch user data and saved addresses
