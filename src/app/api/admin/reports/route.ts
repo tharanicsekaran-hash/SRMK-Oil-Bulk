@@ -41,11 +41,11 @@ export async function GET(request: NextRequest) {
     // Base where clause for date filtering
     const dateFilter = startDate ? { createdAt: { gte: startDate } } : {};
 
-    // Calculate COLLECTED revenue (all delivered orders = money in hand)
-    // In this business: COD delivery = cash collected immediately
+    // Calculate COLLECTED revenue (delivered + paid orders only)
     const collectedOrders = await prisma.order.findMany({
       where: {
         deliveryStatus: "DELIVERED",
+        paymentStatus: "PAID",
         ...dateFilter,
       },
       select: {
@@ -72,10 +72,11 @@ export async function GET(request: NextRequest) {
     const codToCollectRevenue = pendingCodOrders.reduce((sum, order) => sum + order.totalPaisa, 0);
     const codToCollectCount = pendingCodOrders.length;
 
-    // Calculate total products sold (items quantity from delivered orders)
+    // Calculate total products sold (items quantity from delivered + paid orders)
     const deliveredOrdersWithItems = await prisma.order.findMany({
       where: {
         deliveryStatus: "DELIVERED",
+        paymentStatus: "PAID",
         ...dateFilter,
       },
       include: {
@@ -123,10 +124,11 @@ export async function GET(request: NextRequest) {
       }
 
       if (prevStartDate && prevEndDate) {
-        // Previous period revenue (delivered orders)
+        // Previous period revenue (delivered + paid orders)
         const previousPeriodOrders = await prisma.order.findMany({
           where: {
             deliveryStatus: "DELIVERED",
+            paymentStatus: "PAID",
             createdAt: {
               gte: prevStartDate,
               lt: prevEndDate,

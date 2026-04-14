@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import Razorpay from "razorpay";
 import crypto from "crypto";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 export async function POST(request: NextRequest) {
@@ -10,15 +12,28 @@ export async function POST(request: NextRequest) {
       razorpayOrderId,
       razorpayPaymentId,
       razorpaySignature,
-      orderId, // Our database order ID
+      orderPayload,
     } = body as {
       razorpayOrderId: string;
       razorpayPaymentId: string;
       razorpaySignature: string;
-      orderId: string;
+      orderPayload: {
+        items: { productId?: string; productSlug?: string; productName: string; unit: string; pricePaisa: number; qty: number }[];
+        customerName?: string;
+        customerPhone?: string;
+        addressLine1?: string;
+        addressLine2?: string;
+        city?: string;
+        state?: string;
+        postalCode?: string;
+        lat?: number;
+        lng?: number;
+        notes?: string;
+        deliveryChargePaisa?: number;
+      };
     };
 
-    if (!razorpayOrderId || !razorpayPaymentId || !razorpaySignature || !orderId) {
+    if (!razorpayOrderId || !razorpayPaymentId || !razorpaySignature || !orderPayload) {
       return NextResponse.json(
         { error: "Missing required payment verification fields" },
         { status: 400 }
@@ -54,6 +69,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify payment with Razorpay API
+    let paymentAmountPaisa = 0;
     try {
       const payment = await razorpay.payments.fetch(razorpayPaymentId);
       
@@ -63,6 +79,7 @@ export async function POST(request: NextRequest) {
           { status: 400 }
         );
       }
+      paymentAmountPaisa = Number(payment.amount);
     } catch (error) {
       console.error("❌ Razorpay payment fetch error:", error);
       return NextResponse.json(
@@ -71,16 +88,54 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Update order in database
-    const order = await prisma.order.update({
-      where: { id: orderId },
+    // Validate payload and amount before creating database order
+    if (!orderPayload.items?.length) {
+      return NextResponse.json({ error: "No items in order payload" }, { status: 400 });
+    }
+    const subtotalPaisa = orderPayload.items.reduce((sum, item) => sum + item.pricePaisa * item.qty, 0);
+    const expectedTotalPaisa = subtotalPaisa + (orderPayload.deliveryChargePaisa || 0);
+
+    if (expectedTotalPaisa !== paymentAmountPaisa) {
+      return NextResponse.json(
+        { error: "Payment amount mismatch. Order not created." },
+        { status: 400 }
+      );
+    }
+
+    const session = await getServerSession(authOptions);
+
+    // Create paid order in database only after successful payment verification
+    const order = await prisma.order.create({
       data: {
+        userId: session?.user?.id || null,
         paymentStatus: "PAID",
+        paymentMethod: "RAZORPAY",
         status: "CONFIRMED",
+        totalPaisa: expectedTotalPaisa,
+        customerName: orderPayload.customerName,
+        customerPhone: orderPayload.customerPhone,
+        addressLine1: orderPayload.addressLine1,
+        addressLine2: orderPayload.addressLine2,
+        city: orderPayload.city,
+        state: orderPayload.state,
+        postalCode: orderPayload.postalCode,
+        lat: orderPayload.lat,
+        lng: orderPayload.lng,
+        notes: orderPayload.notes,
+        items: {
+          create: orderPayload.items.map((item) => ({
+            productId: item.productId,
+            productSlug: item.productSlug,
+            productName: item.productName,
+            unit: item.unit,
+            quantity: item.qty,
+            pricePaisa: item.pricePaisa,
+          })),
+        },
       },
     });
 
-    console.log("✅ Payment verified and order updated:", order.id);
+    console.log("✅ Payment verified and order created:", order.id);
 
     // Send email notification to admin (fire and forget)
     const notificationUrl = `${process.env.NEXTAUTH_URL || "http://localhost:4000"}/api/admin/notify-new-order`;

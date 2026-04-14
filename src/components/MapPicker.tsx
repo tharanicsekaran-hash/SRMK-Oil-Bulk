@@ -4,6 +4,13 @@ import { useI18n } from "@/components/LanguageProvider";
 import Image from "next/image";
 
 export type LatLng = { lat: number; lng: number };
+export type PlaceDetails = {
+  addressLine?: string;
+  city?: string;
+  state?: string;
+  postalCode?: string;
+  formattedAddress?: string;
+};
 
 declare global {
   interface Window {
@@ -23,8 +30,16 @@ async function loadGoogleMaps(apiKey: string): Promise<void> {
   mapsLoaderPromise = new Promise((resolve, reject) => {
     const existing = document.querySelector<HTMLScriptElement>("script[data-google-maps]");
     if (existing) {
-      existing.addEventListener("load", () => resolve());
-      existing.addEventListener("error", () => reject(new Error("Google Maps failed to load")));
+      if (window.google?.maps?.places) {
+        resolve();
+        return;
+      }
+      existing.addEventListener("load", () => resolve(), { once: true });
+      existing.addEventListener(
+        "error",
+        () => reject(new Error("Google Maps failed to load")),
+        { once: true }
+      );
       return;
     }
 
@@ -43,18 +58,31 @@ async function loadGoogleMaps(apiKey: string): Promise<void> {
 
 export default function MapPicker({ 
   value, 
-  onChange 
+  onChange,
+  onPlaceSelected,
 }: { 
   value?: LatLng; 
-  onChange: (v: LatLng) => void 
+  onChange: (v: LatLng) => void;
+  onPlaceSelected?: (place: PlaceDetails) => void;
 }) {
   const mapRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const markerRef = useRef<google.maps.Marker | null>(null);
   const mapInstance = useRef<google.maps.Map | null>(null);
+  const initialCenterRef = useRef<LatLng>(value ?? { lat: 13.0827, lng: 80.2707 });
+  const onChangeRef = useRef(onChange);
+  const onPlaceSelectedRef = useRef(onPlaceSelected);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { t } = useI18n();
+
+  useEffect(() => {
+    onChangeRef.current = onChange;
+  }, [onChange]);
+
+  useEffect(() => {
+    onPlaceSelectedRef.current = onPlaceSelected;
+  }, [onPlaceSelected]);
 
   const getCurrentLocation = () => {
     if (!navigator.geolocation) {
@@ -75,7 +103,7 @@ export default function MapPicker({
         console.log("Current location obtained:", pos);
         
         // Always call onChange to update parent component
-        onChange(pos);
+        onChangeRef.current(pos);
         
         // Update map if it's initialized
         if (mapInstance.current) {
@@ -99,7 +127,6 @@ export default function MapPicker({
   };
 
   useEffect(() => {
-    let map: google.maps.Map | null = null;
     let autocomplete: google.maps.places.Autocomplete | null = null;
     let listener: google.maps.MapsEventListener | null = null;
 
@@ -116,15 +143,15 @@ export default function MapPicker({
         if (!mapRef.current) return;
 
         // Initialize map
-        map = new google.maps.Map(mapRef.current, {
-          center: value ?? { lat: 13.0827, lng: 80.2707 }, // Default to Chennai
+        const map = new google.maps.Map(mapRef.current, {
+          center: initialCenterRef.current,
           zoom: 12,
         });
         mapInstance.current = map;
 
         // Add marker
         markerRef.current = new google.maps.Marker({
-          position: value ?? { lat: 13.0827, lng: 80.2707 },
+          position: initialCenterRef.current,
           map,
           draggable: true,
         });
@@ -133,14 +160,14 @@ export default function MapPicker({
         listener = markerRef.current.addListener("dragend", () => {
           const pos = markerRef.current?.getPosition();
           if (pos) {
-            onChange({ lat: pos.lat(), lng: pos.lng() });
+            onChangeRef.current({ lat: pos.lat(), lng: pos.lng() });
           }
         });
 
         // Initialize autocomplete if input exists
         if (inputRef.current) {
           autocomplete = new google.maps.places.Autocomplete(inputRef.current, {
-            fields: ["geometry", "name", "formatted_address"],
+            fields: ["geometry", "name", "formatted_address", "address_components"],
             componentRestrictions: { country: "in" },
           });
 
@@ -153,7 +180,33 @@ export default function MapPicker({
             map.setCenter(latlng);
             map.setZoom(16);
             markerRef.current?.setPosition(latlng);
-            onChange(latlng);
+            onChangeRef.current(latlng);
+
+            if (onPlaceSelectedRef.current) {
+              const components = place?.address_components ?? [];
+              const getByType = (type: string) =>
+                components.find((component) => component.types.includes(type))?.long_name;
+
+              const sublocality =
+                getByType("sublocality_level_1") ||
+                getByType("sublocality") ||
+                getByType("neighborhood");
+              const locality = getByType("locality") || getByType("postal_town");
+              const district = getByType("administrative_area_level_2");
+              const state = getByType("administrative_area_level_1");
+              const postalCode = getByType("postal_code");
+
+              onPlaceSelectedRef.current({
+                addressLine:
+                  (place?.name && sublocality && place.name !== sublocality)
+                    ? `${place.name}, ${sublocality}`
+                    : place?.name || sublocality || place?.formatted_address || "",
+                city: locality || district || "",
+                state: state || "",
+                postalCode: postalCode || "",
+                formattedAddress: place?.formatted_address || "",
+              });
+            }
           });
         }
       } catch (err) {
@@ -166,11 +219,21 @@ export default function MapPicker({
 
     return () => {
       // Cleanup
-      if (listener) google.maps.event.removeListener(listener);
-      if (autocomplete) google.maps.event.clearInstanceListeners(autocomplete);
+      if (listener && window.google?.maps?.event) {
+        window.google.maps.event.removeListener(listener);
+      }
+      if (autocomplete && window.google?.maps?.event) {
+        window.google.maps.event.clearInstanceListeners(autocomplete);
+      }
       if (markerRef.current) markerRef.current.setMap(null);
     };
-  }, [value, onChange]);
+  }, []);
+
+  useEffect(() => {
+    if (!value || !mapInstance.current || !markerRef.current) return;
+    mapInstance.current.setCenter(value);
+    markerRef.current.setPosition(value);
+  }, [value]);
 
   return (
     <div className="flex flex-col gap-2">

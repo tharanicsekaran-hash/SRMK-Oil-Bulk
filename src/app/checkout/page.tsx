@@ -1,7 +1,7 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useSession } from "next-auth/react";
-import MapPicker, { type LatLng } from "@/components/MapPicker";
+import MapPicker, { type LatLng, type PlaceDetails } from "@/components/MapPicker";
 import { useI18n } from "@/components/LanguageProvider";
 import { useCart } from "@/store/cart";
 import { formatPricePaisa } from "@/lib/products";
@@ -43,6 +43,7 @@ export default function CheckoutPage() {
   const [addressLine, setAddressLine] = useState("");
   const [pincode, setPincode] = useState("");
   const [city, setCity] = useState("");
+  const [stateName, setStateName] = useState("");
   const [isLoadingCity, setIsLoadingCity] = useState(false);
   const [location, setLocation] = useState<LatLng | undefined>();
   const [saveAddress, setSaveAddress] = useState(false);
@@ -125,6 +126,17 @@ export default function CheckoutPage() {
     setShowAddressForm(true);
   };
 
+  const handleMapLocationChange = useCallback((latLng: LatLng) => {
+    setLocation(latLng);
+  }, []);
+
+  const handleMapPlaceSelected = useCallback((place: PlaceDetails) => {
+    if (place.addressLine) setAddressLine(place.addressLine);
+    if (place.city) setCity(place.city);
+    if (place.state) setStateName(place.state);
+    if (place.postalCode) setPincode(place.postalCode.replace(/\D/g, "").slice(0, 6));
+  }, []);
+
   const handleAddNewAddress = async (address: {
     id?: string;
     line1: string;
@@ -199,7 +211,7 @@ export default function CheckoutPage() {
         addressLine1: addressLine,
         addressLine2: "",
         city,
-        state: "",
+        state: stateName,
         postalCode: pincode,
         lat: location?.lat,
         lng: location?.lng,
@@ -223,41 +235,28 @@ export default function CheckoutPage() {
             line1: addressLine,
             city,
             postalCode: pincode,
-            state: "",
+            state: stateName,
             lat: location?.lat,
             lng: location?.lng,
           }),
         });
       }
 
-      // Create order in database first
-      const orderRes = await fetch("/api/orders", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          items: items.map((i) => ({
-            productId: i.id,
-            productSlug: i.slug,
-            productName: i.name,
-            unit: i.unit,
-            pricePaisa: i.pricePaisa,
-            qty: i.qty,
-          })),
-          customerName: name,
-          customerPhone: phone,
-          ...orderAddress,
-          notes: comments,
-          paymentMethod,
-          deliveryChargePaisa,
-        }),
-      });
-
-      if (!orderRes.ok) {
-        throw new Error("Order creation failed / ஆர்டர் உருவாக்கம் தோல்வியடைந்தது");
-      }
-
-      const orderData = await orderRes.json();
-      const dbOrderId = orderData.order.id;
+      const orderPayload = {
+        items: items.map((i) => ({
+          productId: i.id,
+          productSlug: i.slug,
+          productName: i.name,
+          unit: i.unit,
+          pricePaisa: i.pricePaisa,
+          qty: i.qty,
+        })),
+        customerName: name,
+        customerPhone: phone,
+        ...orderAddress,
+        notes: comments,
+        deliveryChargePaisa,
+      };
 
       // Handle payment based on method
       if (paymentMethod === "RAZORPAY") {
@@ -267,7 +266,6 @@ export default function CheckoutPage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             amountPaisa: totalPaisa,
-            orderId: dbOrderId,
             customerName: name,
             customerPhone: phone,
           }),
@@ -285,7 +283,7 @@ export default function CheckoutPage() {
           amount: razorpayData.amount,
           currency: razorpayData.currency,
           name: "SRMK Oil Mill",
-          description: `Order #${dbOrderId}`,
+          description: "Online Order Payment",
           order_id: razorpayData.razorpayOrderId,
           handler: async function (response: RazorpayPaymentResponse) {
             try {
@@ -297,7 +295,7 @@ export default function CheckoutPage() {
                   razorpayOrderId: response.razorpay_order_id,
                   razorpayPaymentId: response.razorpay_payment_id,
                   razorpaySignature: response.razorpay_signature,
-                  orderId: dbOrderId,
+                  orderPayload,
                 }),
               });
 
@@ -357,6 +355,20 @@ export default function CheckoutPage() {
           throw new Error("Razorpay SDK not loaded / ரசார்பே SDK ஏற்றப்படவில்லை");
         }
       } else {
+        // COD - create order immediately
+        const orderRes = await fetch("/api/orders", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            ...orderPayload,
+            paymentMethod: "COD",
+          }),
+        });
+
+        if (!orderRes.ok) {
+          throw new Error("Order creation failed / ஆர்டர் உருவாக்கம் தோல்வியடைந்தது");
+        }
+
         // COD - no payment processing needed
         clear();
         setShowSuccessModal(true);
@@ -514,6 +526,12 @@ export default function CheckoutPage() {
                   {isLoadingCity && (
                     <p className="text-xs text-gray-500">Loading city... / நகரம் ஏற்றப்படுகிறது...</p>
                   )}
+                  <input
+                    className="border rounded px-3 py-2"
+                    placeholder="State / மாநிலம்"
+                    value={stateName}
+                    onChange={(e) => setStateName(e.target.value)}
+                  />
                 </div>
                 {session && (
                   <label className="flex items-center gap-2 text-sm">
@@ -537,7 +555,11 @@ export default function CheckoutPage() {
                     ✓ Location set: {location.lat.toFixed(6)}, {location.lng.toFixed(6)}
                   </p>
                 )}
-                <MapPicker value={location} onChange={setLocation} />
+                <MapPicker
+                  value={location}
+                  onChange={handleMapLocationChange}
+                  onPlaceSelected={handleMapPlaceSelected}
+                />
               </div>
             </>
           )}

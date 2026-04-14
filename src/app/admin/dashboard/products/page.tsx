@@ -10,6 +10,7 @@ import {
   Loader2,
   X,
   Package,
+  Upload,
 } from "lucide-react";
 
 type Product = {
@@ -44,6 +45,7 @@ export default function ProductsPage() {
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   
   const showToast = useToast((state) => state.show);
@@ -220,6 +222,33 @@ export default function ProductsPage() {
     } catch (error) {
       console.error("Delete error:", error);
       showToast("Failed to delete product", "error");
+    }
+  };
+
+  const handleImageUpload = async (file: File) => {
+    setIsUploadingImage(true);
+    try {
+      const uploadFormData = new FormData();
+      uploadFormData.append("image", file);
+
+      const res = await fetch("/api/admin/products/upload-image", {
+        method: "POST",
+        body: uploadFormData,
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        showToast(data.error || "Image upload failed", "error");
+        return;
+      }
+
+      setFormData((prev) => ({ ...prev, imageUrl: data.imageUrl || "" }));
+      showToast("Image uploaded successfully", "success");
+    } catch (error) {
+      console.error("Image upload failed:", error);
+      showToast("Image upload failed", "error");
+    } finally {
+      setIsUploadingImage(false);
     }
   };
 
@@ -525,6 +554,32 @@ export default function ProductsPage() {
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Image URL <span className="text-xs text-gray-500">- Relative or full URL</span>
                   </label>
+                  <div className="flex items-center gap-2 mb-2">
+                    <label className="inline-flex items-center gap-2 bg-gray-100 text-gray-700 px-3 py-2 rounded-lg cursor-pointer hover:bg-gray-200 transition-colors">
+                      {isUploadingImage ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Upload className="w-4 h-4" />
+                      )}
+                      <span className="text-sm">
+                        {isUploadingImage ? "Uploading..." : "Upload Image"}
+                      </span>
+                      <input
+                        type="file"
+                        accept="image/png,image/jpeg,image/jpg,image/webp"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            handleImageUpload(file);
+                          }
+                          e.target.value = "";
+                        }}
+                        disabled={isUploadingImage}
+                      />
+                    </label>
+                    <span className="text-xs text-gray-500">JPG, PNG, WEBP (max 5MB)</span>
+                  </div>
                   <input
                     type="text"
                     value={formData.imageUrl}

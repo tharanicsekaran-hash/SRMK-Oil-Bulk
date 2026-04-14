@@ -1,25 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import Razorpay from "razorpay";
-import { prisma } from "@/lib/prisma";
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const {
       amountPaisa,
-      orderId, // Our database order ID
       customerName,
       customerPhone,
     } = body as {
       amountPaisa: number;
-      orderId: string;
       customerName?: string;
       customerPhone?: string;
     };
 
-    if (!amountPaisa || !orderId) {
+    if (!amountPaisa) {
       return NextResponse.json(
-        { error: "Amount and order ID are required" },
+        { error: "Amount is required" },
         { status: 400 }
       );
     }
@@ -37,35 +34,12 @@ export async function POST(request: NextRequest) {
       key_secret: process.env.RAZORPAY_KEY_SECRET,
     });
 
-    // Verify order exists in our database
-    const order = await prisma.order.findUnique({
-      where: { id: orderId },
-    });
-
-    if (!order) {
-      return NextResponse.json(
-        { error: "Order not found" },
-        { status: 404 }
-      );
-    }
-
-    if (order.paymentMethod !== "RAZORPAY") {
-      return NextResponse.json(
-        { error: "Order is not configured for Razorpay payment" },
-        { status: 400 }
-      );
-    }
-
-    // Convert paisa to rupees (Razorpay expects amount in smallest currency unit, which is paisa for INR)
-    const amountInPaisa = amountPaisa;
-
     // Create Razorpay order
     const razorpayOrder = await razorpay.orders.create({
-      amount: amountInPaisa, // Amount in paisa
+      amount: amountPaisa,
       currency: "INR",
-      receipt: `order_${orderId}`,
+      receipt: `checkout_${Date.now()}`,
       notes: {
-        orderId: orderId,
         customerName: customerName || "",
         customerPhone: customerPhone || "",
       },
