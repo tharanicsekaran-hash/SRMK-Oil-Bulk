@@ -55,22 +55,6 @@ export async function GET(request: NextRequest) {
 
     const collectedRevenue = collectedOrders.reduce((sum, order) => sum + order.totalPaisa, 0);
 
-    // Calculate PENDING ORDERS revenue (all orders not yet delivered)
-    const pendingOrders = await prisma.order.findMany({
-      where: {
-        deliveryStatus: {
-          not: "DELIVERED",
-        },
-        ...dateFilter,
-      },
-      select: {
-        totalPaisa: true,
-      },
-    });
-
-    const pendingRevenue = pendingOrders.reduce((sum, order) => sum + order.totalPaisa, 0);
-    const pendingOrdersCount = pendingOrders.length;
-
     // COD to collect = COD orders waiting for delivery (pending COD)
     const pendingCodOrders = await prisma.order.findMany({
       where: {
@@ -121,7 +105,7 @@ export async function GET(request: NextRequest) {
     if (filter !== "all") {
       // Calculate previous period dates
       let prevStartDate: Date | undefined;
-      let prevEndDate = startDate;
+      const prevEndDate = startDate;
 
       switch (filter) {
         case "week":

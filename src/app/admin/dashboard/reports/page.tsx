@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { BarChart3, Download, TrendingUp, Package, Users, DollarSign, Loader2, RefreshCw } from "lucide-react";
 
 type ReportData = {
@@ -23,24 +23,11 @@ export default function ReportsPage() {
   const [selectedFilter, setSelectedFilter] = useState<FilterType>("all");
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
-  useEffect(() => {
-    fetchReportData();
-  }, [selectedFilter]);
-
-  // Auto-refresh reports every 30 seconds
-  useEffect(() => {
-    const interval = setInterval(() => {
-      fetchReportData();
-    }, 30000); // 30 seconds
-
-    return () => clearInterval(interval);
-  }, [selectedFilter]);
-
-  const fetchReportData = async () => {
+  const fetchReportData = useCallback(async () => {
     setIsLoading(true);
     try {
       const res = await fetch(`/api/admin/reports?filter=${selectedFilter}`, {
-        cache: 'no-store', // Prevent caching
+        cache: "no-store", // Prevent caching
       });
       if (res.ok) {
         const reportData = await res.json();
@@ -52,7 +39,17 @@ export default function ReportsPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [selectedFilter]);
+
+  useEffect(() => {
+    fetchReportData();
+  }, [fetchReportData]);
+
+  // Auto-refresh reports every 30 seconds
+  useEffect(() => {
+    const interval = setInterval(fetchReportData, 30000);
+    return () => clearInterval(interval);
+  }, [fetchReportData]);
 
   const handleExport = async () => {
     setIsExporting(true);
