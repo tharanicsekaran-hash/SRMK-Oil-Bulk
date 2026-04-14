@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { BarChart3, Download, TrendingUp, Package, Users, DollarSign, Loader2, AlertCircle } from "lucide-react";
+import { BarChart3, Download, TrendingUp, Package, Users, DollarSign, Loader2, RefreshCw } from "lucide-react";
 
 type ReportData = {
-  paidRevenue: number;
-  unpaidRevenue: number;
-  unpaidOrdersCount: number;
+  collectedRevenue: number;
+  expectedTotal: number;
+  codToCollectRevenue: number;
+  codToCollectCount: number;
   productsSold: number;
   newCustomers: number;
   growthPercentage: number;
@@ -19,19 +20,32 @@ export default function ReportsPage() {
   const [data, setData] = useState<ReportData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
-  const [selectedFilter, setSelectedFilter] = useState<FilterType>("month");
+  const [selectedFilter, setSelectedFilter] = useState<FilterType>("all");
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
   useEffect(() => {
     fetchReportData();
   }, [selectedFilter]);
 
+  // Auto-refresh reports every 30 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchReportData();
+    }, 30000); // 30 seconds
+
+    return () => clearInterval(interval);
+  }, [selectedFilter]);
+
   const fetchReportData = async () => {
     setIsLoading(true);
     try {
-      const res = await fetch(`/api/admin/reports?filter=${selectedFilter}`);
+      const res = await fetch(`/api/admin/reports?filter=${selectedFilter}`, {
+        cache: 'no-store', // Prevent caching
+      });
       if (res.ok) {
         const reportData = await res.json();
         setData(reportData);
+        setLastUpdated(new Date());
       }
     } catch (error) {
       console.error("Failed to fetch report data:", error);
@@ -85,25 +99,43 @@ export default function ReportsPage() {
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Reports</h1>
-          <p className="text-gray-600 mt-1">Analytics and insights for your business</p>
+          <p className="text-gray-600 mt-1">
+            Analytics and insights for your business
+            {lastUpdated && (
+              <span className="text-xs text-gray-500 ml-2">
+                • Last updated: {lastUpdated.toLocaleTimeString()}
+              </span>
+            )}
+          </p>
         </div>
-        <button
-          onClick={handleExport}
-          disabled={isExporting}
-          className="flex items-center justify-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-        >
-          {isExporting ? (
-            <>
-              <Loader2 className="w-5 h-5 animate-spin" />
-              Exporting...
-            </>
-          ) : (
-            <>
-              <Download className="w-5 h-5" />
-              Export Data
-            </>
-          )}
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => fetchReportData()}
+            disabled={isLoading}
+            className="flex items-center justify-center gap-2 bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            title="Refresh data"
+          >
+            <RefreshCw className={`w-5 h-5 ${isLoading ? 'animate-spin' : ''}`} />
+            Refresh
+          </button>
+          <button
+            onClick={handleExport}
+            disabled={isExporting}
+            className="flex items-center justify-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            {isExporting ? (
+              <>
+                <Loader2 className="w-5 h-5 animate-spin" />
+                Exporting...
+              </>
+            ) : (
+              <>
+                <Download className="w-5 h-5" />
+                Export Data
+              </>
+            )}
+          </button>
+        </div>
       </div>
 
       {/* Filter Buttons */}
@@ -132,38 +164,47 @@ export default function ReportsPage() {
         </div>
       ) : (
         <>
-          {/* Revenue Stats - Separate Paid & Unpaid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Paid Revenue */}
-            <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-xl shadow-sm border border-green-600 p-6 text-white">
+          {/* Detailed Revenue Breakdown */}
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
               <div className="flex items-center gap-3 mb-2">
-                <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">
-                  <DollarSign className="w-5 h-5 text-white" />
+                <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+                  <DollarSign className="w-5 h-5 text-green-600" />
                 </div>
-                <span className="text-sm font-medium">Paid Revenue</span>
+                <span className="text-sm text-gray-600">Collected Revenue</span>
               </div>
-              <p className="text-3xl font-bold">
-                ₹{((data?.paidRevenue || 0) / 100).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              <p className="text-2xl font-bold text-green-700">
+                ₹{((data?.collectedRevenue || 0) / 100).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </p>
-              <p className="text-xs text-green-100 mt-1">
-                From delivered & paid orders
+              <p className="text-xs text-gray-500 mt-1">Money in hand (delivered orders)</p>
+            </div>
+
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="w-10 h-10 bg-amber-100 rounded-lg flex items-center justify-center">
+                  <TrendingUp className="w-5 h-5 text-amber-600" />
+                </div>
+                <span className="text-sm text-gray-600">COD to Collect</span>
+              </div>
+              <p className="text-2xl font-bold text-amber-700">
+                ₹{((data?.codToCollectRevenue || 0) / 100).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </p>
+              <p className="text-xs text-gray-500 mt-1">
+                {data?.codToCollectCount || 0} COD orders awaiting delivery
               </p>
             </div>
 
-            {/* Unpaid Revenue (COD Pending) */}
-            <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl shadow-sm border border-orange-600 p-6 text-white">
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
               <div className="flex items-center gap-3 mb-2">
-                <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">
-                  <AlertCircle className="w-5 h-5 text-white" />
+                <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
+                  <BarChart3 className="w-5 h-5 text-purple-600" />
                 </div>
-                <span className="text-sm font-medium">Unpaid Revenue (COD)</span>
+                <span className="text-sm text-gray-600">Total Pipeline</span>
               </div>
-              <p className="text-3xl font-bold">
-                ₹{((data?.unpaidRevenue || 0) / 100).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              <p className="text-2xl font-bold text-purple-700">
+                ₹{((data?.expectedTotal || 0) / 100).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </p>
-              <p className="text-xs text-orange-100 mt-1">
-                {data?.unpaidOrdersCount || 0} delivered COD orders pending payment
-              </p>
+              <p className="text-xs text-gray-500 mt-1">Complete revenue picture</p>
             </div>
           </div>
 
@@ -207,38 +248,6 @@ export default function ReportsPage() {
             </div>
           </div>
 
-          {/* Summary Card */}
-          <div className="bg-blue-50 border border-blue-200 rounded-xl p-6">
-            <h3 className="text-lg font-semibold text-blue-900 mb-4">
-              Revenue Summary - {getFilterLabel(selectedFilter)}
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-              <div>
-                <p className="text-blue-700 mb-1">💰 Total Paid Revenue</p>
-                <p className="text-2xl font-bold text-blue-900">
-                  ₹{((data?.paidRevenue || 0) / 100).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                </p>
-              </div>
-              <div>
-                <p className="text-orange-700 mb-1">⏳ Pending COD Collection</p>
-                <p className="text-2xl font-bold text-orange-900">
-                  ₹{((data?.unpaidRevenue || 0) / 100).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                </p>
-                <p className="text-xs text-orange-600 mt-1">
-                  {data?.unpaidOrdersCount || 0} orders
-                </p>
-              </div>
-              <div>
-                <p className="text-green-700 mb-1">📊 Expected Total</p>
-                <p className="text-2xl font-bold text-green-900">
-                  ₹{(((data?.paidRevenue || 0) + (data?.unpaidRevenue || 0)) / 100).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                </p>
-                <p className="text-xs text-green-600 mt-1">
-                  When all COD collected
-                </p>
-              </div>
-            </div>
-          </div>
 
           {/* Charts Placeholder */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12 text-center">

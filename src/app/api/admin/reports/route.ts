@@ -41,11 +41,11 @@ export async function GET(request: NextRequest) {
     // Base where clause for date filtering
     const dateFilter = startDate ? { createdAt: { gte: startDate } } : {};
 
-    // Calculate PAID revenue (only delivered + paid orders)
-    const paidOrders = await prisma.order.findMany({
+    // Calculate COLLECTED revenue (all delivered orders = money in hand)
+    // In this business: COD delivery = cash collected immediately
+    const collectedOrders = await prisma.order.findMany({
       where: {
         deliveryStatus: "DELIVERED",
-        paymentStatus: "PAID",
         ...dateFilter,
       },
       select: {
@@ -53,14 +53,31 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    const paidRevenue = paidOrders.reduce((sum, order) => sum + order.totalPaisa, 0);
+    const collectedRevenue = collectedOrders.reduce((sum, order) => sum + order.totalPaisa, 0);
 
-    // Calculate UNPAID revenue (delivered COD orders not yet paid)
-    const unpaidOrders = await prisma.order.findMany({
+    // Calculate PENDING ORDERS revenue (all orders not yet delivered)
+    const pendingOrders = await prisma.order.findMany({
       where: {
-        deliveryStatus: "DELIVERED",
-        paymentStatus: "PENDING",
+        deliveryStatus: {
+          not: "DELIVERED",
+        },
+        ...dateFilter,
+      },
+      select: {
+        totalPaisa: true,
+      },
+    });
+
+    const pendingRevenue = pendingOrders.reduce((sum, order) => sum + order.totalPaisa, 0);
+    const pendingOrdersCount = pendingOrders.length;
+
+    // COD to collect = COD orders waiting for delivery (pending COD)
+    const pendingCodOrders = await prisma.order.findMany({
+      where: {
         paymentMethod: "COD",
+        deliveryStatus: {
+          not: "DELIVERED",
+        },
         ...dateFilter,
       },
       select: {
@@ -68,7 +85,8 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    const unpaidRevenue = unpaidOrders.reduce((sum, order) => sum + order.totalPaisa, 0);
+    const codToCollectRevenue = pendingCodOrders.reduce((sum, order) => sum + order.totalPaisa, 0);
+    const codToCollectCount = pendingCodOrders.length;
 
     // Calculate total products sold (items quantity from delivered orders)
     const deliveredOrdersWithItems = await prisma.order.findMany({
@@ -85,6 +103,9 @@ export async function GET(request: NextRequest) {
       (sum, order) => sum + order.items.reduce((itemSum, item) => itemSum + item.quantity, 0),
       0
     );
+
+    // Calculate expected total (collected + COD to collect)
+    const expectedTotal = collectedRevenue + codToCollectRevenue;
 
     // Count new customers
     const newCustomers = await prisma.user.count({
@@ -118,11 +139,10 @@ export async function GET(request: NextRequest) {
       }
 
       if (prevStartDate && prevEndDate) {
-        // Previous period revenue
+        // Previous period revenue (delivered orders)
         const previousPeriodOrders = await prisma.order.findMany({
           where: {
             deliveryStatus: "DELIVERED",
-            paymentStatus: "PAID",
             createdAt: {
               gte: prevStartDate,
               lt: prevEndDate,
@@ -135,29 +155,20 @@ export async function GET(request: NextRequest) {
 
         const prevRevenue = previousPeriodOrders.reduce((sum, order) => sum + order.totalPaisa, 0);
 
-        // Calculate growth
+        // Calculate growth based on collected revenue
         if (prevRevenue > 0) {
-          growthPercentage = ((paidRevenue - prevRevenue) / prevRevenue) * 100;
-        } else if (paidRevenue > 0) {
+          growthPercentage = ((collectedRevenue - prevRevenue) / prevRevenue) * 100;
+        } else if (collectedRevenue > 0) {
           growthPercentage = 100;
         }
       }
     }
 
-    // Count of unpaid COD orders
-    const unpaidOrdersCount = await prisma.order.count({
-      where: {
-        deliveryStatus: "DELIVERED",
-        paymentStatus: "PENDING",
-        paymentMethod: "COD",
-        ...dateFilter,
-      },
-    });
-
     return NextResponse.json({
-      paidRevenue,
-      unpaidRevenue,
-      unpaidOrdersCount,
+      collectedRevenue,
+      expectedTotal,
+      codToCollectRevenue,
+      codToCollectCount,
       productsSold,
       newCustomers,
       growthPercentage: Math.round(growthPercentage * 10) / 10,

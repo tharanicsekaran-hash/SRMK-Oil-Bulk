@@ -17,6 +17,7 @@ import {
   Volume2,
   VolumeX,
   Plus,
+  DollarSign,
 } from "lucide-react";
 import CreateOrderModal from "@/components/CreateOrderModal";
 
@@ -24,6 +25,8 @@ type Order = {
   id: string;
   status: string;
   deliveryStatus: string;
+  paymentStatus: string;
+  paymentMethod: string;
   totalPaisa: number;
   customerName?: string;
   customerPhone?: string;
@@ -340,6 +343,27 @@ export default function OrdersPage() {
     }
   };
 
+  const handleMarkPaid = async (orderId: string) => {
+    if (!confirm("Mark this COD order as paid? This confirms cash has been collected.")) return;
+
+    try {
+      const res = await fetch(`/api/admin/orders/${orderId}/mark-paid`, {
+        method: "POST",
+      });
+
+      if (res.ok) {
+        showToast("Payment status updated to PAID", "success");
+        fetchOrders();
+      } else {
+        const data = await res.json();
+        showToast(data.error || "Failed to update payment status", "error");
+      }
+    } catch (error) {
+      console.error("Mark paid error:", error);
+      showToast("Failed to update payment status", "error");
+    }
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case "PENDING":
@@ -544,9 +568,6 @@ export default function OrdersPage() {
                   Customer
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Location
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Amount
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -554,6 +575,9 @@ export default function OrdersPage() {
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Delivery
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Payment
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Assigned To
@@ -572,9 +596,6 @@ export default function OrdersPage() {
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm text-gray-900">{order.customerName || "Guest"}</div>
                     <div className="text-sm text-gray-500">{order.customerPhone}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {order.city}, {order.postalCode}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-green-600">
                     ₹{(order.totalPaisa / 100).toFixed(2)}
@@ -596,6 +617,30 @@ export default function OrdersPage() {
                     >
                       {order.deliveryStatus}
                     </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="flex flex-col gap-1">
+                      <span
+                        className={`px-2 py-1 text-xs font-medium rounded-full inline-block w-fit ${
+                          order.paymentMethod === "COD"
+                            ? "bg-amber-100 text-amber-800"
+                            : "bg-purple-100 text-purple-800"
+                        }`}
+                      >
+                        {order.paymentMethod}
+                      </span>
+                      <span
+                        className={`px-2 py-1 text-xs font-medium rounded-full inline-block w-fit ${
+                          order.paymentStatus === "PAID"
+                            ? "bg-green-100 text-green-800"
+                            : order.paymentStatus === "PENDING"
+                            ? "bg-yellow-100 text-yellow-800"
+                            : "bg-red-100 text-red-800"
+                        }`}
+                      >
+                        {order.paymentStatus}
+                      </span>
+                    </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     {order.assignedTo?.name || "Unassigned"}
@@ -623,6 +668,17 @@ export default function OrdersPage() {
                           title="Mark as Delivered"
                         >
                           <CheckCircle className="w-5 h-5" />
+                        </button>
+                      )}
+                      {order.deliveryStatus === "DELIVERED" && 
+                       order.paymentMethod === "COD" && 
+                       order.paymentStatus === "PENDING" && (
+                        <button
+                          onClick={() => handleMarkPaid(order.id)}
+                          className="text-green-600 hover:text-green-800 bg-green-50 p-1 rounded"
+                          title="Mark COD as Paid"
+                        >
+                          <DollarSign className="w-5 h-5" />
                         </button>
                       )}
                     </div>
