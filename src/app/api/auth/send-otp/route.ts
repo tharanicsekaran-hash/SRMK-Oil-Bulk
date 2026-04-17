@@ -63,7 +63,7 @@ function generateOTP(length: number = OTP_LENGTH): string {
 
 export async function POST(request: NextRequest) {
   try {
-    const { phone, action } = await request.json();
+    const { phone, action, name } = await request.json();
 
     // Validate phone
     if (!phone) {
@@ -80,6 +80,42 @@ export async function POST(request: NextRequest) {
         { error: "Phone number must be 10 digits" },
         { status: 400 }
       );
+    }
+
+    // Unified customer flow: auth
+    // Existing user: send OTP
+    // New user: require name -> create user -> send OTP
+    if (action === "auth") {
+      const existingUser = await prisma.user.findUnique({
+        where: { phone },
+      });
+
+      if (existingUser) {
+        if (!existingUser.isActive) {
+          return NextResponse.json(
+            { error: "Your account has been deactivated. Please contact support." },
+            { status: 403 }
+          );
+        }
+      } else {
+        const trimmedName = typeof name === "string" ? name.trim() : "";
+        if (!trimmedName) {
+          return NextResponse.json(
+            { error: "Name is required for new users", requiresName: true },
+            { status: 428 }
+          );
+        }
+
+        await prisma.user.create({
+          data: {
+            phone,
+            name: trimmedName,
+            role: "CUSTOMER",
+            isActive: true,
+            passwordHash: null,
+          },
+        });
+      }
     }
 
     // Check if action is 'signup' and user already exists
@@ -162,6 +198,7 @@ export async function POST(request: NextRequest) {
       success: true,
       message: `OTP sent successfully to ${phone}. Valid for ${OTP_EXPIRY_MINUTES} minutes.`,
       expiresIn: OTP_EXPIRY_MINUTES * 60, // in seconds
+      needsName: false,
       // DEV ONLY: Remove this in production
       devOtp: process.env.NODE_ENV === 'development' ? otp : undefined,
     });

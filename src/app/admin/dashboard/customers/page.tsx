@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useToast } from "@/store/toast";
-import { Search, Loader2, Users, ShoppingCart } from "lucide-react";
+import { Search, Loader2, Users, ShoppingCart, Download } from "lucide-react";
 
 type Customer = {
   id: string;
@@ -18,6 +18,7 @@ export default function CustomersPage() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [filteredCustomers, setFilteredCustomers] = useState<Customer[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isExporting, setIsExporting] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
   const showToast = useToast((state) => state.show);
@@ -64,6 +65,33 @@ export default function CustomersPage() {
     setFilteredCustomers(filtered);
   };
 
+  const handleExport = async () => {
+    setIsExporting(true);
+    try {
+      const res = await fetch("/api/admin/customers/export");
+      if (!res.ok) {
+        showToast("Failed to export customers", "error");
+        return;
+      }
+
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `customers-export-${new Date().toISOString().split("T")[0]}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+      showToast("Customers exported successfully", "success");
+    } catch (error) {
+      console.error("Customer export failed:", error);
+      showToast("Failed to export customers", "error");
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -75,9 +103,23 @@ export default function CustomersPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">Customers</h1>
-        <p className="text-gray-600 mt-1">View and manage customer information</p>
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Customers</h1>
+          <p className="text-gray-600 mt-1">View and manage customer information</p>
+        </div>
+        <button
+          onClick={handleExport}
+          disabled={isExporting}
+          className="inline-flex items-center justify-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        >
+          {isExporting ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : (
+            <Download className="w-4 h-4" />
+          )}
+          {isExporting ? "Exporting..." : "Export Customers"}
+        </button>
       </div>
 
       {/* Search */}
