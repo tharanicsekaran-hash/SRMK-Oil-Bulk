@@ -148,6 +148,34 @@ export async function POST(request: NextRequest) {
         user: user,
         verificationToken: otpRecord.id, // For creating session
       });
+    } else if (action === "reset-password") {
+      // For password reset, keep OTP record until password is actually reset
+      // reset-password route validates and deletes this token after update
+      const user = await prisma.user.findUnique({
+        where: { phone },
+        select: { id: true, isActive: true },
+      });
+
+      if (!user) {
+        return NextResponse.json(
+          { error: "No account found for this phone number" },
+          { status: 404 }
+        );
+      }
+
+      if (!user.isActive) {
+        return NextResponse.json(
+          { error: "Account has been deactivated. Please contact support." },
+          { status: 403 }
+        );
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: "OTP verified successfully",
+        action: "reset-password",
+        verificationToken: otpRecord.id,
+      });
     } else {
       // Default: Just verify OTP (for password reset or other uses)
       // Delete OTP for non-signup actions

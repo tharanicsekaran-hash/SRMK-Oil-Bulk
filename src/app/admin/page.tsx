@@ -87,7 +87,7 @@ export default function AdminAuthPage() {
       const res = await fetch("/api/auth/send-otp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone: forgotPhone }),
+        body: JSON.stringify({ phone: forgotPhone, action: "login" }),
       });
 
       const data = await res.json();
@@ -118,7 +118,7 @@ export default function AdminAuthPage() {
       const res = await fetch("/api/auth/verify-otp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone: forgotPhone, otp }),
+        body: JSON.stringify({ phone: forgotPhone, otp, action: "reset-password" }),
       });
 
       const data = await res.json();
@@ -330,7 +330,7 @@ export default function AdminAuthPage() {
                       <>
                         <div>
                           <label htmlFor="otp" className="block text-sm font-medium text-gray-700 mb-2">
-                            Enter OTP (Mock: 123456)
+                            Enter OTP
                           </label>
                           <input
                             id="otp"
