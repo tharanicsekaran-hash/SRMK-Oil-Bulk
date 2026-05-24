@@ -25,7 +25,25 @@ export type Dictionary = {
   };
   product: { size: string; quantity: string; price: string; inStock: string; outOfStock: string; details: string; searchPlaceholder: string; allSizes: string };
   cart: { title: string; empty: string; subtotal: string; checkout: string; delivery: string; total: string; continue: string; shopShort: string; popular: string };
-  checkout: { title: string; address: string; mapHint: string; placeOrder: string; paymentMethod: string; cod: string; commentsTitle: string; commentsPlaceholder: string; contact: string; deliverySection: string; summary: string; deliveryLabel: string; totalLabel: string };
+  checkout: {
+    title: string;
+    address: string;
+    mapHint: string;
+    placeOrder: string;
+    paymentMethod: string;
+    cod: string;
+    commentsTitle: string;
+    commentsPlaceholder: string;
+    contact: string;
+    deliverySection: string;
+    summary: string;
+    deliveryLabel: string;
+    totalLabel: string;
+    alternateContactLabel: string;
+    alternateContactHint: string;
+    alternateContactPlaceholder: string;
+    alternateContactInvalid: string;
+  };
   footer: { contact: string; quickLinks: string };
   about: { title: string; features: { one: string; two: string; three: string }; testimonialsTitle: string };
   account: { title: string; login: string; register: string; orders: string };
@@ -103,6 +121,14 @@ export const ta: Dictionary = {
     summary: "ஆர்டர் சுருக்கம்",
     deliveryLabel: "டெலிவரி",
     totalLabel: "மொத்தம்",
+    alternateContactLabel:
+      "Alternate contact for delivery (optional) / விநியோகத்திற்கான மாற்று தொடர்பு (விருப்பம்)",
+    alternateContactHint:
+      "Someone else at the delivery address we can call if needed / தேவைப்பட்டால் அழைக்கக்கூடிய வேறொரு எண்",
+    alternateContactPlaceholder:
+      "10-digit alternate phone / 10 இலக்க மாற்று தொலைபேசி",
+    alternateContactInvalid:
+      "Alternate contact must be a valid 10-digit phone number / மாற்று தொடர்பு செல்லுபடியாகும் 10 இலக்க தொலைபேசி எண்ணாக இருக்க வேண்டும்",
   },
   footer: { contact: "தொடர்பு", quickLinks: "விரைவு இணைப்புகள்" },
   about: {
@@ -188,6 +214,14 @@ export const en: Dictionary = {
     summary: "Order Summary",
     deliveryLabel: "Delivery",
     totalLabel: "Total",
+    alternateContactLabel:
+      "Alternate contact for delivery (optional) / விநியோகத்திற்கான மாற்று தொடர்பு (விருப்பம்)",
+    alternateContactHint:
+      "Someone else at the delivery address we can call if needed / தேவைப்பட்டால் அழைக்கக்கூடிய வேறொரு எண்",
+    alternateContactPlaceholder:
+      "10-digit alternate phone / 10 இலக்க மாற்று தொலைபேசி",
+    alternateContactInvalid:
+      "Alternate contact must be a valid 10-digit phone number / மாற்று தொடர்பு செல்லுபடியாகும் 10 இலக்க தொலைபேசி எண்ணாக இருக்க வேண்டும்",
   },
   footer: { contact: "Contact", quickLinks: "Quick Links" },
   about: {

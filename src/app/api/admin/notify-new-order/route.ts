@@ -33,9 +33,12 @@ export async function POST(request: NextRequest) {
       customer: order.customerName,
     });
 
+    const adminOrderEmail =
+      process.env.ADMIN_ORDER_NOTIFICATION_EMAIL || "selvaraj.whizzkid@gmail.com";
+
     // Prepare email content
     const emailContent = {
-      to: "tharanicsekaran@gmail.com",
+      to: adminOrderEmail,
       subject: `🎉 New Order #${order.id.slice(-8)} - ₹${(order.totalPaisa / 100).toFixed(2)}`,
       body: `
 🎉 NEW ORDER RECEIVED!
@@ -51,6 +54,7 @@ Date: ${new Date().toLocaleString("en-IN")}
 ━━━━━━━━━━━━━━━━━━━━━━
 Name: ${order.customerName || "N/A"}
 Phone: ${order.customerPhone || "N/A"}
+${order.alternatePhone ? `Alternate phone: ${order.alternatePhone}` : ""}
 
 📍 DELIVERY ADDRESS
 ━━━━━━━━━━━━━━━━━━━━━━

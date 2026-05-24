@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useToast } from "@/store/toast";
 import {
   Plus,
@@ -12,6 +12,16 @@ import {
   Package,
   Upload,
 } from "lucide-react";
+import {
+  digitsOnly,
+  formatAdminPrice,
+  getBaseSlugFromSiblings,
+  intToInput,
+  inputToInt,
+  paisaToRupeeInput,
+  parseUnitList,
+  rupeeInputToPaisa,
+} from "@/lib/admin-product-form";
 
 type Product = {
   id: string;
@@ -39,7 +49,6 @@ type ProductFormData = Omit<Product, "id">;
 
 export default function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
-  const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
@@ -50,7 +59,7 @@ export default function ProductsPage() {
   
   const showToast = useToast((state) => state.show);
 
-  const [formData, setFormData] = useState<ProductFormData>({
+  const emptyFormData = (): ProductFormData => ({
     nameTa: "",
     nameEn: "",
     slug: "",
@@ -71,15 +80,26 @@ export default function ProductsPage() {
     isActive: true,
   });
 
+  const [formData, setFormData] = useState<ProductFormData>(emptyFormData());
+  const [unitPriceInputs, setUnitPriceInputs] = useState<Record<string, string>>({});
+  const [stockInput, setStockInput] = useState("");
+  const [discountInput, setDiscountInput] = useState("");
+
+  const parsedUnits = useMemo(() => parseUnitList(formData.unit), [formData.unit]);
+
+  const syncUnitPriceInputs = (units: string[], existing?: Record<string, string>) => {
+    const source = existing ?? unitPriceInputs;
+    const next: Record<string, string> = {};
+    units.forEach((u) => {
+      next[u] = source[u] ?? "";
+    });
+    setUnitPriceInputs(next);
+  };
+
   useEffect(() => {
     fetchProducts();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  useEffect(() => {
-    filterProducts();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchQuery, categoryFilter, products]);
 
   const fetchProducts = async () => {
     try {
@@ -98,81 +118,122 @@ export default function ProductsPage() {
     }
   };
 
-  const filterProducts = () => {
-    let filtered = [...products];
-
-    // Search filter
-    if (searchQuery) {
-      filtered = filtered.filter(
-        (p) =>
-          p.nameEn.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          p.nameTa.includes(searchQuery) ||
-          p.sku?.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-    }
-
-    // Category filter
-    if (categoryFilter !== "all") {
-      filtered = filtered.filter((p) => p.category === categoryFilter);
-    }
-
-    setFilteredProducts(filtered);
-  };
-
   const categories = Array.from(new Set(products.map((p) => p.category).filter(Boolean)));
+
+  const productGroups = useMemo(() => {
+    const groups = new Map<string, Product[]>();
+    products.forEach((p) => {
+      const key = p.nameEn;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key)!.push(p);
+    });
+    groups.forEach((variants) => {
+      variants.sort((a, b) => a.unit.localeCompare(b.unit));
+    });
+    return Array.from(groups.values());
+  }, [products]);
+
+  const filteredGroups = useMemo(() => {
+    return productGroups.filter((variants) => {
+      const p = variants[0];
+      if (searchQuery) {
+        const q = searchQuery.toLowerCase();
+        const matchesSearch =
+          p.nameEn.toLowerCase().includes(q) ||
+          p.nameTa.includes(searchQuery) ||
+          variants.some((v) => v.sku?.toLowerCase().includes(q));
+        if (!matchesSearch) return false;
+      }
+      if (categoryFilter !== "all" && p.category !== categoryFilter) return false;
+      return true;
+    });
+  }, [productGroups, searchQuery, categoryFilter]);
+
+  const resetNumericInputs = () => {
+    setUnitPriceInputs({});
+    setStockInput("");
+    setDiscountInput("");
+  };
 
   const openCreateModal = () => {
     setEditingProduct(null);
-    setFormData({
-      nameTa: "",
-      nameEn: "",
-      slug: "",
-      taglineTa: "",
-      taglineEn: "",
-      descriptionTa: "",
-      descriptionEn: "",
-      imageUrl: "",
-      pricePaisa: 0,
-      unit: "",
-      inStock: true,
-      stockQuantity: 0,
-      discount: 0,
-      offerTextTa: "",
-      offerTextEn: "",
-      category: "",
-      sku: "",
-      isActive: true,
-    });
+    setFormData(emptyFormData());
+    resetNumericInputs();
     setIsModalOpen(true);
   };
 
   const openEditModal = (product: Product) => {
-    setEditingProduct(product);
+    const siblings = products
+      .filter((p) => p.nameEn === product.nameEn)
+      .sort((a, b) => a.unit.localeCompare(b.unit));
+    const primary = siblings[0];
+    const baseSlug = getBaseSlugFromSiblings(siblings);
+
+    setEditingProduct(primary);
     setFormData({
-      nameTa: product.nameTa,
-      nameEn: product.nameEn,
-      slug: product.slug,
-      taglineTa: product.taglineTa || "",
-      taglineEn: product.taglineEn || "",
-      descriptionTa: product.descriptionTa || "",
-      descriptionEn: product.descriptionEn || "",
-      imageUrl: product.imageUrl || "",
-      pricePaisa: product.pricePaisa,
-      unit: product.unit,
-      inStock: product.inStock,
-      stockQuantity: product.stockQuantity,
-      discount: product.discount,
-      offerTextTa: product.offerTextTa || "",
-      offerTextEn: product.offerTextEn || "",
-      category: product.category || "",
-      sku: product.sku || "",
-      isActive: product.isActive,
+      nameTa: primary.nameTa,
+      nameEn: primary.nameEn,
+      slug: baseSlug,
+      taglineTa: primary.taglineTa || "",
+      taglineEn: primary.taglineEn || "",
+      descriptionTa: primary.descriptionTa || "",
+      descriptionEn: primary.descriptionEn || "",
+      imageUrl: primary.imageUrl || "",
+      pricePaisa: primary.pricePaisa,
+      unit: siblings.map((s) => s.unit).join(", "),
+      inStock: primary.inStock,
+      stockQuantity: primary.stockQuantity,
+      discount: primary.discount,
+      offerTextTa: primary.offerTextTa || "",
+      offerTextEn: primary.offerTextEn || "",
+      category: primary.category || "",
+      sku: primary.sku || "",
+      isActive: primary.isActive,
     });
+    const prices: Record<string, string> = {};
+    siblings.forEach((s) => {
+      prices[s.unit] = paisaToRupeeInput(s.pricePaisa);
+    });
+    setUnitPriceInputs(prices);
+    setStockInput(intToInput(primary.stockQuantity));
+    setDiscountInput(intToInput(primary.discount));
     setIsModalOpen(true);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    const stockQuantity = inputToInt(stockInput);
+    const discount = inputToInt(discountInput);
+    const units = parseUnitList(formData.unit);
+
+    if (units.length === 0) {
+      showToast("Please enter at least one unit (comma-separated)", "error");
+      return;
+    }
+
+    const unitVariants = units.map((unit) => ({
+      unit,
+      pricePaisa: rupeeInputToPaisa(unitPriceInputs[unit] || ""),
+    }));
+
+    if (unitVariants.some((v) => !v.pricePaisa)) {
+      showToast("Please enter a price for each unit", "error");
+      return;
+    }
+    if (discount > 100) {
+      showToast("Discount cannot exceed 100%", "error");
+      return;
+    }
+
+    const payload = {
+      ...formData,
+      stockQuantity,
+      discount,
+      unit: units.join(", "),
+      unitVariants,
+    };
+
     setIsSubmitting(true);
 
     try {
@@ -185,7 +246,7 @@ export default function ProductsPage() {
       const res = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(payload),
       });
 
       if (res.ok) {
@@ -207,11 +268,17 @@ export default function ProductsPage() {
     }
   };
 
-  const handleDelete = async (id: string, name: string) => {
-    if (!confirm(`Are you sure you want to delete "${name}"?`)) return;
+  const handleDelete = async (variants: Product[]) => {
+    const name = variants[0].nameEn;
+    const sizeNote =
+      variants.length > 1 ? ` and all ${variants.length} sizes` : "";
+    if (!confirm(`Are you sure you want to delete "${name}"${sizeNote}?`)) return;
 
     try {
-      const res = await fetch(`/api/admin/products/${id}`, { method: "DELETE" });
+      const res = await fetch(
+        `/api/admin/products/${variants[0].id}?allVariants=true`,
+        { method: "DELETE" }
+      );
       
       if (res.ok) {
         showToast("Product deleted successfully", "success");
@@ -307,7 +374,14 @@ export default function ProductsPage() {
 
       {/* Products Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredProducts.map((product) => (
+        {filteredGroups.map((variants) => {
+          const product = variants[0];
+          const unitLabels = variants.map((v) => v.unit).join(", ");
+          const maxDiscount = Math.max(...variants.map((v) => v.discount));
+          const totalStock = variants.reduce((sum, v) => sum + v.stockQuantity, 0);
+          const allInactive = variants.every((v) => !v.isActive);
+
+          return (
           <div
             key={product.id}
             className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow"
@@ -326,14 +400,14 @@ export default function ProductsPage() {
                   <Package className="w-16 h-16 text-gray-400" />
                 </div>
               )}
-              {!product.isActive && (
+              {allInactive && (
                 <div className="absolute top-2 right-2 bg-red-500 text-white text-xs px-2 py-1 rounded">
                   Inactive
                 </div>
               )}
-              {product.discount > 0 && (
+              {maxDiscount > 0 && (
                 <div className="absolute top-2 left-2 bg-green-500 text-white text-xs px-2 py-1 rounded">
-                  {product.discount}% OFF
+                  {maxDiscount}% OFF
                 </div>
               )}
             </div>
@@ -344,17 +418,24 @@ export default function ProductsPage() {
               <p className="text-sm text-gray-600 mb-3">{product.nameTa}</p>
 
               <div className="space-y-2 text-sm">
-                <div className="flex items-center justify-between">
-                  <span className="text-gray-600">Price:</span>
-                  <span className="font-semibold text-green-600">
-                    ₹{(product.pricePaisa / 100).toFixed(2)} / {product.unit}
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-gray-600 shrink-0">Price:</span>
+                  <span className="font-semibold text-green-600 text-right">
+                    {variants.some((v) => v.pricePaisa !== product.pricePaisa)
+                      ? "Varies by size"
+                      : formatAdminPrice(product.pricePaisa)}
                   </span>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-600">Units:</span>
+                  <span className="text-gray-900 text-right">{unitLabels}</span>
                 </div>
 
                 <div className="flex items-center justify-between">
                   <span className="text-gray-600">Stock:</span>
                   <span className={product.inStock ? "text-green-600" : "text-red-600"}>
-                    {product.stockQuantity} units
+                    {totalStock}
                   </span>
                 </div>
 
@@ -383,7 +464,7 @@ export default function ProductsPage() {
                   Edit
                 </button>
                 <button
-                  onClick={() => handleDelete(product.id, product.nameEn)}
+                  onClick={() => handleDelete(variants)}
                   className="flex-1 flex items-center justify-center gap-2 bg-red-50 text-red-600 px-3 py-2 rounded-lg hover:bg-red-100 transition-colors"
                 >
                   <Trash2 className="w-4 h-4" />
@@ -392,10 +473,11 @@ export default function ProductsPage() {
               </div>
             </div>
           </div>
-        ))}
+          );
+        })}
       </div>
 
-      {filteredProducts.length === 0 && (
+      {filteredGroups.length === 0 && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12 text-center">
           <Package className="w-16 h-16 text-gray-400 mx-auto mb-4" />
           <h3 className="text-lg font-semibold text-gray-900 mb-2">No products found</h3>
@@ -464,50 +546,67 @@ export default function ProductsPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Unit *</label>
-                  <input
-                    type="text"
-                    value={formData.unit}
-                    onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
-                    placeholder="e.g., 500ml, 1L"
-                    required
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
-                </div>
-
-                <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Price (₹) *
+                    Units * <span className="text-xs font-normal text-gray-500">(comma-separated)</span>
                   </label>
                   <input
                     type="text"
-                    inputMode="decimal"
-                    value={(formData.pricePaisa / 100).toFixed(2)}
+                    value={formData.unit}
                     onChange={(e) => {
-                      const value = e.target.value.replace(/[^0-9.]/g, '');
-                      const numValue = parseFloat(value);
-                      if (!isNaN(numValue)) {
-                        setFormData({ ...formData, pricePaisa: Math.round(numValue * 100) });
-                      } else if (value === '' || value === '.') {
-                        setFormData({ ...formData, pricePaisa: 0 });
-                      }
+                      const nextUnit = e.target.value;
+                      setFormData({ ...formData, unit: nextUnit });
+                      syncUnitPriceInputs(parseUnitList(nextUnit));
                     }}
-                    placeholder="e.g., 280.00"
+                    placeholder="e.g., 500ml, 1L, 2L"
                     required
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Each unit appears as a separate size option on the store
+                  </p>
                 </div>
+
+                {parsedUnits.length > 0 && (
+                  <div className="md:col-span-2 space-y-3">
+                    <label className="block text-sm font-medium text-gray-700">
+                      Price per unit (₹) *
+                    </label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {parsedUnits.map((unit) => (
+                        <div key={unit} className="flex items-center gap-3">
+                          <span className="text-sm text-gray-600 w-16 shrink-0 font-medium">{unit}</span>
+                          <input
+                            type="text"
+                            inputMode="numeric"
+                            value={unitPriceInputs[unit] ?? ""}
+                            onChange={(e) => {
+                              const next = digitsOnly(e.target.value);
+                              setUnitPriceInputs((prev) => ({ ...prev, [unit]: next }));
+                            }}
+                            placeholder="e.g., 280"
+                            required
+                            className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Stock Quantity *
                   </label>
                   <input
-                    type="number"
-                    value={formData.stockQuantity}
-                    onChange={(e) =>
-                      setFormData({ ...formData, stockQuantity: parseInt(e.target.value) || 0 })
-                    }
+                    type="text"
+                    inputMode="numeric"
+                    value={stockInput}
+                    onChange={(e) => {
+                      const next = digitsOnly(e.target.value);
+                      setStockInput(next);
+                      setFormData({ ...formData, stockQuantity: inputToInt(next) });
+                    }}
+                    placeholder="e.g., 100"
                     required
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
@@ -518,13 +617,16 @@ export default function ProductsPage() {
                     Discount (%)
                   </label>
                   <input
-                    type="number"
-                    min="0"
-                    max="100"
-                    value={formData.discount}
-                    onChange={(e) =>
-                      setFormData({ ...formData, discount: parseInt(e.target.value) || 0 })
-                    }
+                    type="text"
+                    inputMode="numeric"
+                    value={discountInput}
+                    onChange={(e) => {
+                      const next = digitsOnly(e.target.value);
+                      const capped = next.length > 3 ? next.slice(0, 3) : next;
+                      setDiscountInput(capped);
+                      setFormData({ ...formData, discount: inputToInt(capped) });
+                    }}
+                    placeholder="e.g., 10"
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
                 </div>

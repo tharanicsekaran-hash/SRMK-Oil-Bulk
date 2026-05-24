@@ -13,13 +13,14 @@ import {
   Phone,
   Package,
   Copy,
-  Map,
+  Map as MapIcon,
   Volume2,
   VolumeX,
   Plus,
   DollarSign,
 } from "lucide-react";
 import CreateOrderModal from "@/components/CreateOrderModal";
+import CustomerPhoneDisplay from "@/components/CustomerPhoneDisplay";
 
 type Order = {
   id: string;
@@ -30,6 +31,7 @@ type Order = {
   totalPaisa: number;
   customerName?: string;
   customerPhone?: string;
+  alternatePhone?: string;
   addressLine1?: string;
   addressLine2?: string;
   city?: string;
@@ -41,6 +43,8 @@ type Order = {
   assignedTo?: { name?: string };
   createdAt: string;
   items: {
+    productId?: string;
+    productSlug?: string;
     productName: string;
     quantity: number;
     unit: string;
@@ -54,6 +58,12 @@ type DeliveryUser = {
   phone: string;
 };
 
+type ProductGroup = {
+  nameEn: string;
+  nameTa: string;
+  variantIds: string[];
+};
+
 export default function OrdersPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [filteredOrders, setFilteredOrders] = useState<Order[]>([]);
@@ -65,6 +75,8 @@ export default function OrdersPage() {
   const [assignedToFilter, setAssignedToFilter] = useState("all");
   const [pincodeFilter, setPincodeFilter] = useState("");
   const [dateFilter, setDateFilter] = useState("all"); // all, today, yesterday, last7days, last30days
+  const [productFilter, setProductFilter] = useState("all");
+  const [productGroups, setProductGroups] = useState<ProductGroup[]>([]);
   
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
@@ -83,6 +95,7 @@ export default function OrdersPage() {
   useEffect(() => {
     fetchOrders();
     fetchDeliveryUsers();
+    fetchProducts();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -111,7 +124,17 @@ export default function OrdersPage() {
   useEffect(() => {
     filterOrders();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchQuery, statusFilter, deliveryStatusFilter, assignedToFilter, pincodeFilter, dateFilter, orders]);
+  }, [
+    searchQuery,
+    statusFilter,
+    deliveryStatusFilter,
+    assignedToFilter,
+    pincodeFilter,
+    dateFilter,
+    productFilter,
+    productGroups,
+    orders,
+  ]);
 
   const fetchOrders = async () => {
     try {
@@ -216,6 +239,50 @@ export default function OrdersPage() {
     }
   };
 
+  const fetchProducts = async () => {
+    try {
+      const res = await fetch("/api/admin/products");
+      if (!res.ok) return;
+
+      const data: { id: string; nameEn: string; nameTa: string }[] = await res.json();
+      const groups = new Map<string, ProductGroup>();
+
+      data.forEach((product) => {
+        const existing = groups.get(product.nameEn);
+        if (existing) {
+          existing.variantIds.push(product.id);
+        } else {
+          groups.set(product.nameEn, {
+            nameEn: product.nameEn,
+            nameTa: product.nameTa,
+            variantIds: [product.id],
+          });
+        }
+      });
+
+      setProductGroups(
+        Array.from(groups.values()).sort((a, b) => a.nameEn.localeCompare(b.nameEn))
+      );
+    } catch (error) {
+      console.error("Failed to fetch products:", error);
+    }
+  };
+
+  const orderContainsProduct = (order: Order, group: ProductGroup) =>
+    order.items.some((item) => {
+      if (item.productId && group.variantIds.includes(item.productId)) return true;
+      return item.productName === group.nameEn || item.productName === group.nameTa;
+    });
+
+  const getProductQuantityInOrder = (order: Order, group: ProductGroup) =>
+    order.items.reduce((sum, item) => {
+      const matches =
+        (item.productId && group.variantIds.includes(item.productId)) ||
+        item.productName === group.nameEn ||
+        item.productName === group.nameTa;
+      return matches ? sum + item.quantity : sum;
+    }, 0);
+
   const filterOrders = () => {
     let filtered = [...orders];
 
@@ -253,6 +320,14 @@ export default function OrdersPage() {
       filtered = filtered.filter((o) => o.postalCode?.includes(pincodeFilter));
     }
 
+    // Product filter (all sizes/variants of the same product name)
+    if (productFilter !== "all") {
+      const group = productGroups.find((p) => p.nameEn === productFilter);
+      if (group) {
+        filtered = filtered.filter((o) => orderContainsProduct(o, group));
+      }
+    }
+
     // Date filter
     if (dateFilter !== "all") {
       const now = new Date();
@@ -283,6 +358,42 @@ export default function OrdersPage() {
     }
 
     setFilteredOrders(filtered);
+  };
+
+  const selectedProductGroup =
+    productFilter !== "all"
+      ? productGroups.find((p) => p.nameEn === productFilter)
+      : null;
+
+  const filteredProductStats = selectedProductGroup
+    ? {
+        orders: filteredOrders.length,
+        units: filteredOrders.reduce(
+          (sum, o) => sum + getProductQuantityInOrder(o, selectedProductGroup),
+          0
+        ),
+        revenuePaisa: filteredOrders.reduce((sum, o) => {
+          return (
+            sum +
+            o.items.reduce((lineSum, item) => {
+              const matches =
+                (item.productId &&
+                  selectedProductGroup.variantIds.includes(item.productId)) ||
+                item.productName === selectedProductGroup.nameEn ||
+                item.productName === selectedProductGroup.nameTa;
+              return matches ? lineSum + item.pricePaisa * item.quantity : lineSum;
+            }, 0)
+          );
+        }, 0),
+      }
+    : null;
+
+  const dateFilterLabel: Record<string, string> = {
+    all: "all time",
+    today: "today",
+    yesterday: "yesterday",
+    last7days: "last 7 days",
+    last30days: "last 30 days",
   };
 
   const openDetailModal = (order: Order) => {
@@ -499,7 +610,21 @@ export default function OrdersPage() {
             />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+            <select
+              value={productFilter}
+              onChange={(e) => setProductFilter(e.target.value)}
+              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              <option value="all">All Products</option>
+              {productGroups.map((product) => (
+                <option key={product.nameEn} value={product.nameEn}>
+                  {product.nameEn}
+                  {product.nameTa ? ` (${product.nameTa})` : ""}
+                </option>
+              ))}
+            </select>
+
             <select
               value={dateFilter}
               onChange={(e) => setDateFilter(e.target.value)}
@@ -552,6 +677,24 @@ export default function OrdersPage() {
               ))}
             </select>
           </div>
+
+          {filteredProductStats && selectedProductGroup && (
+            <div className="rounded-lg bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-900">
+              <span className="font-semibold">{selectedProductGroup.nameEn}</span>
+              {selectedProductGroup.nameTa && (
+                <span className="text-amber-800"> · {selectedProductGroup.nameTa}</span>
+              )}
+              <span className="text-amber-800">
+                {" "}
+                — {filteredProductStats.orders} order
+                {filteredProductStats.orders !== 1 ? "s" : ""} in{" "}
+                {dateFilterLabel[dateFilter] ?? dateFilter}, {filteredProductStats.units} unit
+                {filteredProductStats.units !== 1 ? "s" : ""} sold, ₹
+                {(filteredProductStats.revenuePaisa / 100).toLocaleString("en-IN")} revenue
+                (product line items only)
+              </span>
+            </div>
+          )}
         </div>
       </div>
 
@@ -595,7 +738,11 @@ export default function OrdersPage() {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm text-gray-900">{order.customerName || "Guest"}</div>
-                    <div className="text-sm text-gray-500">{order.customerPhone}</div>
+                    <CustomerPhoneDisplay
+                      phone={order.customerPhone}
+                      alternatePhone={order.alternatePhone}
+                      compact
+                    />
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-green-600">
                     ₹{(order.totalPaisa / 100).toFixed(2)}
@@ -758,20 +905,18 @@ export default function OrdersPage() {
               <div>
                 <h3 className="font-semibold text-gray-900 mb-3">Customer Information</h3>
                 <div className="space-y-3 text-sm">
-                  <div className="flex items-center gap-2">
-                    <Phone className="w-4 h-4 text-gray-400" />
-                    <a
-                      href={`tel:${selectedOrder.customerPhone}`}
-                      className="text-blue-600 hover:underline"
-                    >
-                      {selectedOrder.customerPhone}
-                    </a>
-                  </div>
                   {selectedOrder.customerName && (
                     <div className="text-gray-700">
                       <span className="font-medium">Name:</span> {selectedOrder.customerName}
                     </div>
                   )}
+                  <div className="flex items-start gap-2">
+                    <Phone className="w-4 h-4 text-gray-400 mt-0.5 shrink-0" />
+                    <CustomerPhoneDisplay
+                      phone={selectedOrder.customerPhone}
+                      alternatePhone={selectedOrder.alternatePhone}
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -818,7 +963,7 @@ export default function OrdersPage() {
                         onClick={() => openMap(selectedOrder.lat!, selectedOrder.lng!)}
                         className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm transition-colors"
                       >
-                        <Map className="w-4 h-4" />
+                        <MapIcon className="w-4 h-4" />
                         View on Map
                       </button>
                     )}

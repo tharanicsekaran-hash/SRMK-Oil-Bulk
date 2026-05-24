@@ -132,7 +132,11 @@ export default function ProductDetailPage() {
       unit: activeProduct.unit,
       inStock: activeProduct.inStock,
     };
-    add(cartProduct, qty, name, { pricePaisa: activeProduct.pricePaisa, unit: activeProduct.unit });
+    add(cartProduct, qty, name, {
+      pricePaisa: activeProduct.pricePaisa,
+      unit: activeProduct.unit,
+      discount: activeProduct.discount ?? 0,
+    });
     showToast(`${name} (${activeProduct.unit}) added to cart`);
   };
 
@@ -149,7 +153,11 @@ export default function ProductDetailPage() {
       unit: activeProduct.unit,
       inStock: activeProduct.inStock,
     };
-    add(cartProduct, qty, name, { pricePaisa: activeProduct.pricePaisa, unit: activeProduct.unit });
+    add(cartProduct, qty, name, {
+      pricePaisa: activeProduct.pricePaisa,
+      unit: activeProduct.unit,
+      discount: activeProduct.discount ?? 0,
+    });
     router.push("/checkout");
   };
 
@@ -181,6 +189,11 @@ export default function ProductDetailPage() {
         {/* Product Image */}
         <div className="p-4 rounded-xl bg-white border shadow-sm">
           <div className="relative aspect-square w-full overflow-hidden rounded-lg bg-gradient-to-br from-amber-50 to-amber-100">
+            {activeProduct.discount > 0 && (
+              <span className="absolute top-3 left-3 z-10 bg-green-600 text-white text-sm font-semibold px-2.5 py-1 rounded shadow-sm">
+                {activeProduct.discount}% OFF
+              </span>
+            )}
             {activeProduct.imageUrl ? (
               <Image
                 src={activeProduct.imageUrl}
@@ -207,11 +220,6 @@ export default function ProductDetailPage() {
               <span className={`text-sm font-medium ${activeProduct.inStock ? 'text-green-600' : 'text-red-600'}`}>
                 {activeProduct.inStock ? t.product.inStock : t.product.outOfStock}
               </span>
-              {activeProduct.discount > 0 && (
-                <span className="px-2 py-1 text-xs font-semibold bg-green-100 text-green-700 rounded">
-                  {activeProduct.discount}% OFF
-                </span>
-              )}
             </div>
           </div>
 

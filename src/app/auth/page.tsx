@@ -9,7 +9,19 @@ type AuthStep = "phone" | "otp";
 
 function AuthContent() {
   const searchParams = useSearchParams();
-  const redirectUrl = searchParams.get("redirect") || "/account";
+  const redirectUrl =
+    searchParams.get("callbackUrl") ||
+    searchParams.get("redirect") ||
+    "/account";
+
+  const isCustomerDestination = (url: string) => {
+    const path = url.split("?")[0];
+    return (
+      path.startsWith("/checkout") ||
+      path.startsWith("/cart") ||
+      path.startsWith("/products")
+    );
+  };
   const { locale } = useI18n();
   const showToast = useToast((s) => s.show);
 
@@ -117,7 +129,11 @@ function AuthContent() {
         const session = await sessionResponse.json();
 
         let finalRedirectUrl = redirectUrl;
-        if (session?.user?.role === "ADMIN" || session?.user?.role === "DELIVERY") {
+        const role = session?.user?.role;
+        if (
+          (role === "ADMIN" || role === "DELIVERY") &&
+          !isCustomerDestination(redirectUrl)
+        ) {
           finalRedirectUrl = "/admin/dashboard";
         }
 

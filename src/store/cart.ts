@@ -10,12 +10,18 @@ export type CartItem = {
   pricePaisa: number;
   unit: string;
   qty: number;
+  discount?: number; // percentage off (0-100)
   imageUrl?: string;
 };
 
 type CartState = {
   items: CartItem[];
-  add: (p: Product, qty?: number, name?: string, override?: { pricePaisa: number; unit: string }) => void;
+  add: (
+    p: Product & { discount?: number },
+    qty?: number,
+    name?: string,
+    override?: { pricePaisa: number; unit: string; discount?: number }
+  ) => void;
   remove: (id: string, unit?: string) => void;
   clear: () => void;
   setQty: (id: string, qty: number, unit?: string) => void;
@@ -39,6 +45,7 @@ export const useCart = create<CartState>()(
             pricePaisa: override?.pricePaisa ?? p.pricePaisa,
             unit: keyUnit,
             qty,
+            discount: override?.discount ?? p.discount ?? 0,
             imageUrl: p.imageUrl,
           });
         }

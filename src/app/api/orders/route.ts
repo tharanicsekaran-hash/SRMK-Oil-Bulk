@@ -36,6 +36,7 @@ export async function POST(req: Request) {
       items,
       customerName,
       customerPhone,
+      alternatePhone,
       addressLine1,
       addressLine2,
       city,
@@ -50,6 +51,7 @@ export async function POST(req: Request) {
       items: { productId?: string; productSlug?: string; productName: string; unit: string; pricePaisa: number; qty: number }[];
       customerName?: string;
       customerPhone?: string;
+      alternatePhone?: string;
       addressLine1?: string;
       addressLine2?: string;
       city?: string;
@@ -80,6 +82,7 @@ export async function POST(req: Request) {
         totalPaisa,
         customerName,
         customerPhone,
+        alternatePhone: alternatePhone || null,
         addressLine1,
         addressLine2,
         city,

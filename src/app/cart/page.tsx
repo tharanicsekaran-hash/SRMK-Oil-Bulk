@@ -3,6 +3,7 @@ import Link from "next/link";
 import { useCart } from "@/store/cart";
 import { useI18n } from "@/components/LanguageProvider";
 import { formatPricePaisa } from "@/lib/products";
+import { cartTotals, unitPriceAfterDiscountPaisa } from "@/lib/pricing";
 import Image from "next/image";
 import ProductCard from "@/components/ProductCard";
 import { useState, useEffect, useMemo } from "react";
@@ -66,9 +67,17 @@ export default function CartPage() {
     return Array.from(groups.values());
   }, [products]);
 
-  const subtotal = items.reduce((sum, i) => sum + i.pricePaisa * i.qty, 0);
+  const itemsWithDiscount = items.map((i) => {
+    if (i.discount != null && i.discount > 0) return i;
+    const match = products.find((p) => p.id === i.id || p.slug === i.slug);
+    return { ...i, discount: match?.discount ?? 0 };
+  });
+
   const deliveryChargePaisa = 0; // Free delivery
-  const totalPaisa = subtotal + deliveryChargePaisa;
+  const { subtotalPaisa, discountPaisa, totalPaisa } = cartTotals(
+    itemsWithDiscount,
+    deliveryChargePaisa
+  );
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-6 pb-24 md:pb-6">
@@ -96,9 +105,10 @@ export default function CartPage() {
         </div>
       ) : (
         <div className="flex flex-col gap-4">
-          {items.map((i) => {
+          {itemsWithDiscount.map((i) => {
             const p = products.find((sp) => sp.id === i.id || sp.slug === i.slug);
             const imageSrc = i.imageUrl || p?.imageUrl || "/images/groundnut.jpg";
+            const unitPrice = unitPriceAfterDiscountPaisa(i.pricePaisa, i.discount ?? 0);
             return (
             <div key={`${i.id}-${i.unit}`} className="flex items-center justify-between border rounded p-3">
               <div className="flex items-center gap-3">
@@ -107,7 +117,12 @@ export default function CartPage() {
                 </div>
                 <div className="flex flex-col">
                   <div className="font-medium">{i.name}</div>
-                  <div className="text-sm text-gray-600">{i.unit} · {formatPricePaisa(i.pricePaisa, locale)}</div>
+                  <div className="text-sm text-gray-600">
+                    {i.unit} · {formatPricePaisa(unitPrice, locale)}
+                    {(i.discount ?? 0) > 0 && (
+                      <span className="text-green-600 ml-1">({i.discount}% off)</span>
+                    )}
+                  </div>
                 </div>
               </div>
               <div className="flex items-center gap-3">
@@ -126,15 +141,21 @@ export default function CartPage() {
           <div className="space-y-1 border-t pt-4">
             <div className="flex items-center justify-between">
               <div className="text-sm text-gray-600">{t.cart.subtotal}</div>
-              <div className="text-base font-medium">{formatPricePaisa(subtotal, locale)}</div>
+              <div className="text-base font-medium">{formatPricePaisa(subtotalPaisa, locale)}</div>
             </div>
+            {discountPaisa > 0 && (
+              <div className="flex items-center justify-between text-green-600">
+                <div className="text-sm">Discount</div>
+                <div className="text-base font-medium">−{formatPricePaisa(discountPaisa, locale)}</div>
+              </div>
+            )}
             <div className="flex items-center justify-between">
               <div className="text-sm text-gray-600">Delivery</div>
               <div className="text-base font-medium">{formatPricePaisa(deliveryChargePaisa, locale)}</div>
             </div>
             <div className="flex items-center justify-between">
               <div className="text-sm text-gray-600">Total</div>
-              <div className="text-lg font-semibold">{formatPricePaisa(totalPaisa, locale)}</div>
+              <div className="text-lg font-semibold text-[#d97706]">{formatPricePaisa(totalPaisa, locale)}</div>
             </div>
           </div>
           <div className="hidden md:flex gap-3">
@@ -152,7 +173,10 @@ export default function CartPage() {
         <div className="md:hidden fixed inset-x-0 bottom-0 border-t bg-white px-4 py-3 shadow">
           <div className="max-w-4xl mx-auto flex items-center justify-between gap-3">
             <div>
-              <div className="text-[10px] text-gray-600">Subtotal: {formatPricePaisa(subtotal, locale)}</div>
+              <div className="text-[10px] text-gray-600">Subtotal: {formatPricePaisa(subtotalPaisa, locale)}</div>
+              {discountPaisa > 0 && (
+                <div className="text-[10px] text-green-600">Discount: −{formatPricePaisa(discountPaisa, locale)}</div>
+              )}
               <div className="text-[10px] text-gray-600">Delivery: {formatPricePaisa(deliveryChargePaisa, locale)}</div>
               <div className="text-base font-semibold">Total: {formatPricePaisa(totalPaisa, locale)}</div>
             </div>

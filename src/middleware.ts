@@ -14,13 +14,7 @@ export default withAuth(
       }
     }
 
-    // Customer routes (checkout, account)
-    if (path.startsWith("/checkout") || path.startsWith("/account")) {
-      // Check if user is a customer (not admin/delivery)
-      if (token?.role && token.role !== "CUSTOMER") {
-        return NextResponse.redirect(new URL("/admin/dashboard", req.url));
-      }
-    }
+    // Checkout & account: any authenticated role may access (admin/delivery can shop too)
   },
   {
     callbacks: {

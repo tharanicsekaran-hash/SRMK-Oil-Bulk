@@ -86,6 +86,7 @@ model Order {
   // Delivery details
   customerName   String?
   customerPhone  String?
+  alternatePhone String?  // optional delivery contact
   addressLine1   String?
   addressLine2   String?
   city           String?

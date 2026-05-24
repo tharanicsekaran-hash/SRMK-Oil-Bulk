@@ -42,6 +42,11 @@ export default function ProductCard({ variants }: { variants: Product[] }) {
     <div className="group h-full flex flex-col rounded-xl border shadow-sm overflow-hidden bg-white transition hover:shadow-md hover:-translate-y-0.5">
       <div className="p-4">
         <div className="relative aspect-[3/4] md:aspect-[4/5] w-full overflow-hidden rounded-xl bg-gradient-to-br from-amber-50 to-amber-100">
+          {p.discount != null && p.discount > 0 && (
+            <span className="absolute top-2 left-2 z-10 bg-green-600 text-white text-xs font-semibold px-2 py-1 rounded shadow-sm">
+              {p.discount}% OFF
+            </span>
+          )}
           {p.imageUrl && (
             <Image
               src={p.imageUrl}
@@ -98,15 +103,8 @@ export default function ProductCard({ variants }: { variants: Product[] }) {
         </div>
 
         <div className="mt-auto">
-          <div className="flex items-baseline gap-2">
-            <div className="text-xl font-semibold text-[#d97706]">
-              {formatPricePaisa(p.pricePaisa, locale)}
-            </div>
-            {p.discount != null && p.discount > 0 && (
-              <span className="text-xs text-green-600 font-medium">
-                {p.discount}% OFF
-              </span>
-            )}
+          <div className="text-xl font-semibold text-[#d97706]">
+            {formatPricePaisa(p.pricePaisa, locale)}
           </div>
           {(p.offerTextEn || p.offerTextTa) && (
             <p className="text-xs text-green-600 mt-1">
@@ -121,7 +119,7 @@ export default function ProductCard({ variants }: { variants: Product[] }) {
               className="px-3.5 py-2.5 text-sm whitespace-nowrap rounded bg-[#d97706] text-white hover:bg-[#b76405] flex-1 text-center min-w-0 disabled:opacity-50 disabled:cursor-not-allowed"
               disabled={!p.inStock}
               onClick={() => {
-                add(p, qty, name, { pricePaisa: p.pricePaisa, unit: p.unit });
+                add(p, qty, name, { pricePaisa: p.pricePaisa, unit: p.unit, discount: p.discount ?? 0 });
                 showToast(`${name} (${p.unit}) added to cart`);
               }}
             >

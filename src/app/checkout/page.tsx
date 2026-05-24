@@ -5,6 +5,7 @@ import MapPicker, { type LatLng, type PlaceDetails } from "@/components/MapPicke
 import { useI18n } from "@/components/LanguageProvider";
 import { useCart } from "@/store/cart";
 import { formatPricePaisa } from "@/lib/products";
+import { cartTotals, lineTotalPaisa, unitPriceAfterDiscountPaisa } from "@/lib/pricing";
 import { useRouter } from "next/navigation";
 import { MapPin, Plus } from "lucide-react";
 import AddressModal from "@/components/AddressModal";
@@ -24,7 +25,7 @@ type SavedAddress = {
 };
 
 export default function CheckoutPage() {
-  const { locale } = useI18n();
+  const { locale, t } = useI18n();
   const router = useRouter();
   const { items, clear } = useCart();
   const { data: session } = useSession();
@@ -47,6 +48,7 @@ export default function CheckoutPage() {
   const [isLoadingCity, setIsLoadingCity] = useState(false);
   const [location, setLocation] = useState<LatLng | undefined>();
   const [saveAddress, setSaveAddress] = useState(false);
+  const [alternatePhone, setAlternatePhone] = useState("");
   
   // Payment and notes
   const [paymentMethod, setPaymentMethod] = useState<"COD" | "RAZORPAY">("COD");
@@ -55,10 +57,38 @@ export default function CheckoutPage() {
   
   // Success modal
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [catalogProducts, setCatalogProducts] = useState<
+    { id: string; slug: string; discount: number }[]
+  >([]);
 
-  const subtotal = items.reduce((sum, i) => sum + i.pricePaisa * i.qty, 0);
+  useEffect(() => {
+    fetch("/api/products")
+      .then((res) => (res.ok ? res.json() : []))
+      .then((data) => setCatalogProducts(data))
+      .catch(() => setCatalogProducts([]));
+  }, []);
+
+  const itemsWithDiscount = items.map((i) => {
+    if (i.discount != null && i.discount > 0) return i;
+    const match = catalogProducts.find((p) => p.id === i.id || p.slug === i.slug);
+    return { ...i, discount: match?.discount ?? 0 };
+  });
+
   const deliveryChargePaisa = 0; // Free delivery
-  const totalPaisa = subtotal + deliveryChargePaisa;
+  const { subtotalPaisa, discountPaisa, totalPaisa } = cartTotals(
+    itemsWithDiscount,
+    deliveryChargePaisa
+  );
+
+  const buildOrderItems = () =>
+    itemsWithDiscount.map((i) => ({
+      productId: i.id,
+      productSlug: i.slug,
+      productName: i.name,
+      unit: i.unit,
+      pricePaisa: unitPriceAfterDiscountPaisa(i.pricePaisa, i.discount ?? 0),
+      qty: i.qty,
+    }));
 
   // Fetch user data and saved addresses
   useEffect(() => {
@@ -223,6 +253,13 @@ export default function CheckoutPage() {
       return;
     }
 
+    const primaryDigits = phone.replace(/\D/g, "").slice(0, 10);
+    const alternateDigits = alternatePhone.replace(/\D/g, "").slice(0, 10);
+    if (alternateDigits && alternateDigits.length !== 10) {
+      alert(t.checkout.alternateContactInvalid);
+      return;
+    }
+
     setIsProcessingPayment(true);
 
     try {
@@ -243,16 +280,10 @@ export default function CheckoutPage() {
       }
 
       const orderPayload = {
-        items: items.map((i) => ({
-          productId: i.id,
-          productSlug: i.slug,
-          productName: i.name,
-          unit: i.unit,
-          pricePaisa: i.pricePaisa,
-          qty: i.qty,
-        })),
+        items: buildOrderItems(),
         customerName: name,
-        customerPhone: phone,
+        customerPhone: primaryDigits,
+        alternatePhone: alternateDigits || undefined,
         ...orderAddress,
         notes: comments,
         deliveryChargePaisa,
@@ -391,6 +422,25 @@ export default function CheckoutPage() {
   // Determine if we should show saved addresses section
   const shouldShowSavedAddresses = session && savedAddresses.length > 0 && !showAddressForm;
 
+  const alternatePhoneField = (
+    <div className="pt-3 border-t border-gray-200 space-y-2">
+      <label className="text-sm font-medium text-gray-800 block">
+        {t.checkout.alternateContactLabel}
+      </label>
+      <p className="text-xs text-gray-500">{t.checkout.alternateContactHint}</p>
+      <input
+        type="tel"
+        className="border rounded px-3 py-2 w-full"
+        placeholder={t.checkout.alternateContactPlaceholder}
+        value={alternatePhone}
+        onChange={(e) => setAlternatePhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
+        inputMode="numeric"
+        maxLength={10}
+        aria-label={t.checkout.alternateContactLabel}
+      />
+    </div>
+  );
+
   return (
     <div className="max-w-5xl mx-auto px-4 py-6">
       <div className="mb-5">
@@ -473,6 +523,8 @@ export default function CheckoutPage() {
                 ))}
               </div>
 
+              {alternatePhoneField}
+
               <button
                 onClick={handleUseDifferentAddress}
                 className="w-full py-2 text-sm text-orange-600 hover:text-orange-700 border border-orange-300 rounded hover:bg-orange-50 transition"
@@ -533,6 +585,9 @@ export default function CheckoutPage() {
                     onChange={(e) => setStateName(e.target.value)}
                   />
                 </div>
+
+                {alternatePhoneField}
+
                 {session && (
                   <label className="flex items-center gap-2 text-sm">
                     <input
@@ -606,26 +661,46 @@ export default function CheckoutPage() {
           <div className="border rounded p-4 space-y-3">
             <div className="font-semibold">Order Summary / ஆர்டர் சுருக்கம்</div>
             <div className="space-y-2 max-h-60 overflow-auto">
-              {items.map((i) => (
-                <div key={`${i.id}-${i.unit}`} className="flex justify-between text-sm">
-                  <div>
-                    {i.name} ({i.unit}) × {i.qty}
+              {itemsWithDiscount.map((i) => {
+                const lineTotal = lineTotalPaisa(i);
+                const hasDiscount = (i.discount ?? 0) > 0;
+                return (
+                  <div key={`${i.id}-${i.unit}`} className="flex justify-between text-sm gap-2">
+                    <div className="min-w-0">
+                      {i.name} ({i.unit}) × {i.qty}
+                      {hasDiscount && (
+                        <span className="ml-1 text-green-600 text-xs">({i.discount}% off)</span>
+                      )}
+                    </div>
+                    <div className="text-right shrink-0">
+                      {hasDiscount && (
+                        <div className="text-xs text-gray-400 line-through">
+                          {formatPricePaisa(i.pricePaisa * i.qty, locale)}
+                        </div>
+                      )}
+                      <div>{formatPricePaisa(lineTotal, locale)}</div>
+                    </div>
                   </div>
-                  <div>{formatPricePaisa(i.pricePaisa * i.qty, locale)}</div>
-                </div>
-              ))}
+                );
+              })}
             </div>
             <div className="flex justify-between border-t pt-3">
               <div className="text-sm text-gray-600">Subtotal / உபத்திரை</div>
-              <div className="font-semibold">{formatPricePaisa(subtotal, locale)}</div>
+              <div className="font-semibold">{formatPricePaisa(subtotalPaisa, locale)}</div>
             </div>
+            {discountPaisa > 0 && (
+              <div className="flex justify-between text-green-600">
+                <div className="text-sm">Discount / தள்ளுபடி</div>
+                <div className="font-medium">−{formatPricePaisa(discountPaisa, locale)}</div>
+              </div>
+            )}
             <div className="flex justify-between">
               <div className="text-sm text-gray-600">Delivery / விநியோகம்</div>
               <div className="font-medium">{formatPricePaisa(deliveryChargePaisa, locale)}</div>
             </div>
             <div className="flex justify-between border-t pt-2">
               <div className="text-sm font-medium">Total / மொத்தம்</div>
-              <div className="font-semibold">{formatPricePaisa(totalPaisa, locale)}</div>
+              <div className="font-semibold text-[#d97706]">{formatPricePaisa(totalPaisa, locale)}</div>
             </div>
             <button 
               className="w-full mt-4 px-4 py-3 rounded bg-[#d97706] text-white hover:bg-[#b76405] font-medium disabled:opacity-50 disabled:cursor-not-allowed" 

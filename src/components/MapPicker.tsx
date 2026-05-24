@@ -20,6 +20,66 @@ declare global {
 
 let mapsLoaderPromise: Promise<void> | null = null;
 
+function placeDetailsFromComponents(
+  components: google.maps.GeocoderAddressComponent[],
+  options?: { formattedAddress?: string; name?: string }
+): PlaceDetails {
+  const getByType = (type: string) =>
+    components.find((component) => component.types.includes(type))?.long_name;
+
+  const sublocality =
+    getByType("sublocality_level_1") ||
+    getByType("sublocality") ||
+    getByType("neighborhood");
+  const locality = getByType("locality") || getByType("postal_town");
+  const district = getByType("administrative_area_level_2");
+  const state = getByType("administrative_area_level_1");
+  const postalCode = getByType("postal_code");
+  const name = options?.name;
+
+  return {
+    addressLine:
+      name && sublocality && name !== sublocality
+        ? `${name}, ${sublocality}`
+        : name || sublocality || options?.formattedAddress || "",
+    city: locality || district || "",
+    state: state || "",
+    postalCode: postalCode || "",
+    formattedAddress: options?.formattedAddress || "",
+  };
+}
+
+function reverseGeocodeLatLng(latlng: LatLng): Promise<PlaceDetails | null> {
+  return new Promise((resolve) => {
+    if (!window.google?.maps) {
+      resolve(null);
+      return;
+    }
+    const geocoder = new google.maps.Geocoder();
+    geocoder.geocode({ location: latlng }, (results, status) => {
+      if (status !== "OK" || !results?.[0]) {
+        resolve(null);
+        return;
+      }
+      const result = results[0];
+      resolve(
+        placeDetailsFromComponents(result.address_components ?? [], {
+          formattedAddress: result.formatted_address,
+        })
+      );
+    });
+  });
+}
+
+async function notifyPlaceAtLatLng(
+  latlng: LatLng,
+  onPlaceSelected?: (place: PlaceDetails) => void
+) {
+  if (!onPlaceSelected) return;
+  const details = await reverseGeocodeLatLng(latlng);
+  if (details) onPlaceSelected(details);
+}
+
 async function loadGoogleMaps(apiKey: string): Promise<void> {
   if (typeof window === "undefined") return;
   if (window.google?.maps?.places) return;
@@ -100,17 +160,15 @@ export default function MapPicker({
           lng: position.coords.longitude
         };
         
-        console.log("Current location obtained:", pos);
-        
-        // Always call onChange to update parent component
         onChangeRef.current(pos);
-        
-        // Update map if it's initialized
+
         if (mapInstance.current) {
           mapInstance.current.setCenter(pos);
           mapInstance.current.setZoom(16);
           markerRef.current?.setPosition(pos);
         }
+
+        notifyPlaceAtLatLng(pos, onPlaceSelectedRef.current);
         setIsLoading(false);
       },
       (error) => {
@@ -128,7 +186,7 @@ export default function MapPicker({
 
   useEffect(() => {
     let autocomplete: google.maps.places.Autocomplete | null = null;
-    let listener: google.maps.MapsEventListener | null = null;
+    const mapListeners: google.maps.MapsEventListener[] = [];
 
     const initializeMap = async () => {
       const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
@@ -156,13 +214,29 @@ export default function MapPicker({
           draggable: true,
         });
 
-        // Handle marker drag end
-        listener = markerRef.current.addListener("dragend", () => {
-          const pos = markerRef.current?.getPosition();
-          if (pos) {
-            onChangeRef.current({ lat: pos.lat(), lng: pos.lng() });
-          }
-        });
+        const updateMarkerPosition = (latlng: LatLng) => {
+          markerRef.current?.setPosition(latlng);
+          onChangeRef.current(latlng);
+          void notifyPlaceAtLatLng(latlng, onPlaceSelectedRef.current);
+        };
+
+        mapListeners.push(
+          markerRef.current.addListener("dragend", () => {
+            const pos = markerRef.current?.getPosition();
+            if (pos) {
+              updateMarkerPosition({ lat: pos.lat(), lng: pos.lng() });
+            }
+          })
+        );
+
+        mapListeners.push(
+          map.addListener("click", (event: google.maps.MapMouseEvent) => {
+            const lat = event.latLng?.lat();
+            const lng = event.latLng?.lng();
+            if (lat == null || lng == null) return;
+            updateMarkerPosition({ lat, lng });
+          })
+        );
 
         // Initialize autocomplete if input exists
         if (inputRef.current) {
@@ -183,29 +257,12 @@ export default function MapPicker({
             onChangeRef.current(latlng);
 
             if (onPlaceSelectedRef.current) {
-              const components = place?.address_components ?? [];
-              const getByType = (type: string) =>
-                components.find((component) => component.types.includes(type))?.long_name;
-
-              const sublocality =
-                getByType("sublocality_level_1") ||
-                getByType("sublocality") ||
-                getByType("neighborhood");
-              const locality = getByType("locality") || getByType("postal_town");
-              const district = getByType("administrative_area_level_2");
-              const state = getByType("administrative_area_level_1");
-              const postalCode = getByType("postal_code");
-
-              onPlaceSelectedRef.current({
-                addressLine:
-                  (place?.name && sublocality && place.name !== sublocality)
-                    ? `${place.name}, ${sublocality}`
-                    : place?.name || sublocality || place?.formatted_address || "",
-                city: locality || district || "",
-                state: state || "",
-                postalCode: postalCode || "",
-                formattedAddress: place?.formatted_address || "",
-              });
+              onPlaceSelectedRef.current(
+                placeDetailsFromComponents(place?.address_components ?? [], {
+                  formattedAddress: place?.formatted_address,
+                  name: place?.name,
+                })
+              );
             }
           });
         }
@@ -218,9 +275,8 @@ export default function MapPicker({
     initializeMap();
 
     return () => {
-      // Cleanup
-      if (listener && window.google?.maps?.event) {
-        window.google.maps.event.removeListener(listener);
+      if (window.google?.maps?.event) {
+        mapListeners.forEach((l) => window.google!.maps.event.removeListener(l));
       }
       if (autocomplete && window.google?.maps?.event) {
         window.google.maps.event.clearInstanceListeners(autocomplete);
@@ -279,7 +335,8 @@ export default function MapPicker({
       />
       
       <p className="text-xs text-gray-600">
-        {t?.checkout?.mapHint || "Drag the marker to set your exact location"}
+        {t?.checkout?.mapHint ||
+          "Search, click the map, or drag the pin — address fields will update automatically"}
       </p>
     </div>
   );

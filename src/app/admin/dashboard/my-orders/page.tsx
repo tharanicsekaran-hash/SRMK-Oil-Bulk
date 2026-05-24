@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useToast } from "@/store/toast";
 import { Loader2, Package, MapPin, Phone, CheckCircle } from "lucide-react";
+import CustomerPhoneDisplay from "@/components/CustomerPhoneDisplay";
 
 type Order = {
   id: string;
@@ -11,6 +12,7 @@ type Order = {
   totalPaisa: number;
   customerName?: string;
   customerPhone?: string;
+  alternatePhone?: string;
   addressLine1?: string;
   city?: string;
   postalCode?: string;
@@ -125,9 +127,12 @@ export default function MyOrdersPage() {
 
               {/* Customer Info */}
               <div className="space-y-2">
-                <div className="flex items-center gap-2 text-sm text-gray-700">
-                  <Phone className="w-4 h-4 text-gray-400" />
-                  <span>{order.customerPhone}</span>
+                <div className="flex items-start gap-2 text-sm text-gray-700">
+                  <Phone className="w-4 h-4 text-gray-400 mt-0.5 shrink-0" />
+                  <CustomerPhoneDisplay
+                    phone={order.customerPhone}
+                    alternatePhone={order.alternatePhone}
+                  />
                 </div>
                 <div className="flex items-start gap-2 text-sm text-gray-700">
                   <MapPin className="w-4 h-4 text-gray-400 mt-1 flex-shrink-0" />

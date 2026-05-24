@@ -21,6 +21,7 @@ export async function POST(request: NextRequest) {
         items: { productId?: string; productSlug?: string; productName: string; unit: string; pricePaisa: number; qty: number }[];
         customerName?: string;
         customerPhone?: string;
+        alternatePhone?: string;
         addressLine1?: string;
         addressLine2?: string;
         city?: string;
@@ -114,6 +115,7 @@ export async function POST(request: NextRequest) {
         totalPaisa: expectedTotalPaisa,
         customerName: orderPayload.customerName,
         customerPhone: orderPayload.customerPhone,
+        alternatePhone: orderPayload.alternatePhone || null,
         addressLine1: orderPayload.addressLine1,
         addressLine2: orderPayload.addressLine2,
         city: orderPayload.city,

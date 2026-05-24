@@ -3,11 +3,13 @@
 import { useEffect, useState } from "react";
 import { CheckCircle, Eye, X, MapPin, Phone, User } from "lucide-react";
 import { useToast } from "@/store/toast";
+import CustomerPhoneDisplay from "@/components/CustomerPhoneDisplay";
 
 interface Order {
   id: string;
   customerName?: string;
   customerPhone?: string;
+  alternatePhone?: string;
   addressLine1?: string;
   addressLine2?: string;
   city?: string;
@@ -152,7 +154,10 @@ export default function AssignedOrdersPage() {
 
                   <div className="flex items-start space-x-2">
                     <Phone className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
-                    <p className="text-sm text-gray-700">{order.customerPhone}</p>
+                    <CustomerPhoneDisplay
+                      phone={order.customerPhone}
+                      alternatePhone={order.alternatePhone}
+                    />
                   </div>
 
                   <div className="flex items-start space-x-2">
@@ -229,7 +234,11 @@ export default function AssignedOrdersPage() {
                       <p className="text-sm font-semibold text-gray-900">
                         {order.customerName || "Guest"}
                       </p>
-                      <p className="text-xs text-gray-500">{order.customerPhone}</p>
+                      <CustomerPhoneDisplay
+                        phone={order.customerPhone}
+                        alternatePhone={order.alternatePhone}
+                        compact
+                      />
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-900">{order.city}</td>
                     <td className="px-6 py-4 text-sm font-semibold text-gray-900">
@@ -290,7 +299,12 @@ export default function AssignedOrdersPage() {
               <div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-3">Customer Information</h3>
                 <p className="text-sm"><strong>Name:</strong> {selectedOrder.customerName}</p>
-                <p className="text-sm"><strong>Phone:</strong> {selectedOrder.customerPhone}</p>
+                <div className="text-sm mt-1">
+                  <CustomerPhoneDisplay
+                    phone={selectedOrder.customerPhone}
+                    alternatePhone={selectedOrder.alternatePhone}
+                  />
+                </div>
                 <p className="text-sm">
                   <strong>Address:</strong> {selectedOrder.addressLine1}
                   {selectedOrder.addressLine2 && `, ${selectedOrder.addressLine2}`}, {selectedOrder.city}, {selectedOrder.postalCode}

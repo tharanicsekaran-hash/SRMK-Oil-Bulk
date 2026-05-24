@@ -3,11 +3,13 @@
 import { useEffect, useState } from "react";
 import { useToast } from "@/store/toast";
 import { Loader2, Package, CheckCircle2 } from "lucide-react";
+import CustomerPhoneDisplay from "@/components/CustomerPhoneDisplay";
 
 type DeliveredOrder = {
   id: string;
   totalPaisa: number;
   customerPhone?: string;
+  alternatePhone?: string;
   city?: string;
   postalCode?: string;
   deliveredAt?: string;
@@ -129,8 +131,12 @@ export default function DeliveryHistoryPage() {
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-900">
                     #{order.id.slice(-8)}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {order.customerPhone}
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <CustomerPhoneDisplay
+                      phone={order.customerPhone}
+                      alternatePhone={order.alternatePhone}
+                      compact
+                    />
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     {order.city}, {order.postalCode}
